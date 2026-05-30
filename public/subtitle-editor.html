@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Khmer Subtitle Audio Editor</title>
+<style>
+:root {
+  --primary: #7c3aed;
+  --primary-light: #ede9fe;
+  --primary-dark: #4c1d95;
+  --success: #16a34a;
+  --success-light: #dcfce7;
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --bg: #f5f3ff;
+  --card: #ffffff;
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --border-light: #f3f4f6;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.1);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Consolas', monospace;
+  --font-khmer: 'Leelawadee UI','Khmer OS','Noto Sans Khmer',sans-serif;
+  --timeline-h: 210px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; }
+
+html, body { width: 100%; height: 100%; margin: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr var(--timeline-h);
+  background: var(--card);
+}
+
+/* ── HEADER (grid row 1) ── */
+.header {
+  background: var(--card);
+  border-bottom: 2px solid var(--primary-light);
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+}
+
+.header-logo {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center; justify-content: center;
+  color: #fff; font-size: 15px; font-weight: 800;
+  flex-shrink: 0;
+}
+
+.header-title h1 { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.header-title p { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+.header-spacer { flex: 1; }
+
+/* ── IMPORT BAR ── */
+.import-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 20px 10px;
+  background: #fafafa;
+  border-top: 1px solid var(--border-light);
+}
+
+.import-bar textarea {
+  flex: 1;
+  height: 38px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  resize: none;
+  transition: border-color 0.15s;
+  line-height: 1.4;
+  min-width: 100px;
+}
+
+.import-bar textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+}
+
+.import-or {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 22px; border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap; font-family: inherit; line-height: 1.4;
+  flex-shrink: 0;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #6d28d9; box-shadow: var(--shadow-sm); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover:not(:disabled) { background: #15803d; box-shadow: var(--shadow-sm); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-outline {
+  background: var(--card); color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+}
+.btn-outline:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+.btn-sm { padding: 7px 16px; font-size: 13px; }
+
+.btn-loading { position: relative; color: transparent !important; pointer-events: none; }
+.btn-loading::after {
+  content: ''; position: absolute; inset: 0; margin: auto;
+  width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── SUBTITLE PANEL (grid row 2) ── */
+.subtitle-panel {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOOLBAR ── */
+.toolbar-sticky {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.tl-pill {
+  font-size: 10px; padding: 1px 8px; border-radius: 20px;
+  background: var(--primary-light); color: var(--primary); font-weight: 700;
+  flex-shrink: 0;
+}
+.toolbar-group {
+  display: flex; gap: 4px; align-items: center;
+  padding: 3px 5px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.toolbar-group .lbl { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; padding: 0 5px; }
+.toolbar-sticky .spacer { flex: 1; min-width: 8px; }
+.toolbar-sticky .stats { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+.toolbar-sticky .stats span { display: flex; align-items: center; gap: 4px; }
+.toolbar-sticky .stats .num { font-weight: 700; color: var(--primary); }
+
+/* ── PROGRESS BAR ── */
+.progress-wrap { display: none; padding: 6px 20px 0; flex-shrink: 0; }
+.progress-wrap.visible { display: block; }
+.progress-bar-bg {
+  width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), #a78bfa);
+  border-radius: 3px; transition: width 0.3s ease;
+}
+.progress-label { font-size: 12px; color: var(--text-muted); margin-top: 5px; display: flex; justify-content: space-between; }
+
+/* ── TOAST ── */
+.toast {
+  display: none; align-items: flex-start; gap: 10px;
+  padding: 12px 16px; border-radius: var(--radius-md); margin: 6px 20px 0;
+  font-size: 13px; border: 1px solid transparent; flex-shrink: 0;
+}
+.toast.visible { display: flex; }
+.toast-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.toast-body { flex: 1; }
+.toast-body strong { display: block; font-size: 13px; margin-bottom: 2px; }
+.toast-body p { font-size: 12px; opacity: 0.85; }
+.toast-error { background: var(--danger-light); border-color: #fecaca; color: var(--danger); }
+.toast-success { background: var(--success-light); border-color: #bbf7d0; color: var(--success); }
+
+/* ── TABLE WRAPPER (scrollable) ── */
+.subtitle-table-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.table-card { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; margin: 12px 20px; }
+.table-scroll { overflow: visible; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { position: sticky; top: 0; z-index: 2; }
+th {
+  background: var(--bg); color: var(--text-muted); font-weight: 600;
+  padding: 10px; text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  white-space: nowrap; user-select: none;
+}
+td { padding: 8px 10px; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #faf9ff; }
+tr.selected td { background: var(--primary-light); }
+tr.active-row { box-shadow: inset 3px 0 0 var(--primary); }
+tr.active-row td { background: #e4d9ff; }
+
+.col-check { width: 32px; text-align: center; }
+.col-idx { width: 34px; text-align: center; color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.col-time { width: 70px; }
+.time-display { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.col-text { min-width: 180px; }
+.col-text input {
+  width: 100%; border: 1.5px solid transparent; padding: 6px 8px;
+  border-radius: var(--radius-sm); font-size: 14px;
+  font-family: var(--font-khmer); background: transparent;
+  transition: all 0.15s; line-height: 1.4;
+}
+.col-text input:hover { border-color: var(--border); background: #fff; }
+.col-text input:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(124,58,237,0.08); }
+.col-text input.invalid { border-color: var(--danger); background: var(--danger-light); }
+.col-voice { width: 100px; }
+.col-voice select {
+  width: 100%; padding: 5px 6px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 12px; background: #fff;
+  cursor: pointer; font-family: inherit;
+}
+.col-voice select:focus { outline: none; border-color: var(--primary); }
+.col-status { width: 76px; text-align: center; }
+.badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.badge-pending { background: var(--border-light); color: var(--text-muted); }
+.badge-generating { background: #dbeafe; color: #1e40af; }
+.badge-completed { background: var(--success-light); color: var(--success); }
+.badge-failed { background: var(--danger-light); color: var(--danger); }
+.col-play { width: 36px; text-align: center; }
+.play-circle {
+  width: 28px; height: 28px; border: none; border-radius: 50%;
+  background: var(--primary-light); color: var(--primary);
+  cursor: pointer; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+}
+.play-circle:hover:not(:disabled) { background: var(--primary); color: #fff; transform: scale(1.05); }
+.play-circle.playing { background: var(--danger); color: #fff; }
+.play-circle.playing:hover { background: #b91c1c; }
+.play-circle:disabled { opacity: 0.2; cursor: not-allowed; }
+
+input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; }
+
+.incl-cb {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+  white-space: nowrap; user-select: none; flex-shrink: 0;
+}
+.incl-cb:hover { color: var(--text-secondary); }
+.incl-cb input { width: 13px; height: 13px; }
+
+.num-input {
+  width: 40px; height: 26px; padding: 0 4px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 12px; font-family: var(--font-mono); text-align: center;
+  background: #fff; outline: none;
+  -moz-appearance: textfield;
+}
+.num-input::-webkit-inner-spin-button,
+.num-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.num-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(124,58,237,0.1); }
+
+/* ── EMPTY STATE ── */
+.empty-box { text-align: center; padding: 56px 20px; }
+.empty-box .empty-icon { font-size: 40px; margin-bottom: 14px; opacity: 0.6; }
+.empty-box strong { display: block; font-size: 16px; color: var(--text-secondary); margin-bottom: 4px; }
+.empty-box p { font-size: 13px; color: var(--text-muted); }
+
+/* ── TIMELINE PANEL (grid row 3) ── */
+.timeline-panel {
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+#timelineSection {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+#timelineSection.visible {
+  display: flex;
+}
+
+.timeline-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.timeline-toolbar h2 {
+  font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.timeline-scroll-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 20px;
+
+
+.timeline-box {
+  position: relative;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #fff;
+  min-width: 100%;
+}
+
+.timeline-inner { position: relative; min-height: 84px; }
+.timeline-tracks { padding-left: 56px; position: relative; }
+.timeline-ruler {
+  position: relative; height: 24px;
+  border-bottom: 1px solid var(--border-light); background: #fafafa;
+}
+.ruler-tick {
+  position: absolute; top: 0; width: 1px; height: 8px; background: var(--border);
+}
+.ruler-label {
+  position: absolute; top: 10px; font-size: 9px; color: var(--text-muted);
+  transform: translateX(-50%); white-space: nowrap; font-family: var(--font-mono);
+}
+.timeline-row {
+  position: relative; height: 28px; border-bottom: 1px solid var(--border-light);
+}
+.timeline-row:last-child { border-bottom: none; }
+.timeline-label {
+  position: absolute; left: -50px; top: 6px; font-size: 9px; color: var(--text-muted);
+  width: 46px; text-align: right; padding-right: 6px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+}
+.tl-block {
+  position: absolute; top: 2px; height: 24px; border-radius: 4px;
+  font-size: 10px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; cursor: pointer; transition: box-shadow 0.15s, background 0.15s;
+  border: 1.5px solid transparent; padding: 0 4px; user-select: none;
+}
+.tl-block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); z-index: 2; }
+.tl-block.selected { border-color: var(--primary-dark); border-width: 2px; box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
+.tl-sub { background: #bbf7d0; color: #166534; }
+.tl-aud { background: #c4b5fd; color: var(--primary-dark); }
+.tl-aud.playing { background: var(--danger); color: #fff; }
+.tl-aud.can-play:hover { background: var(--primary); color: #fff; }
+.tl-empty { background: var(--border-light); color: var(--text-muted); border: 1px dashed var(--border); }
+.playhead-line {
+  position: absolute; top: 0; width: 2px; height: 100%;
+  background: var(--danger); z-index: 10; pointer-events: none;
+  transition: left 0.15s ease;
+}
+.playhead-line::before {
+  content: ''; position: absolute; top: 0; left: -5px;
+  width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 7px solid var(--danger);
+}
+
+/* ── STATUS BAR ── */
+.status-bar {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 18px;
+  padding: 6px 20px;
+  background: #fafafa;
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-muted);
+}
+.status-bar .s-item { display: flex; align-items: center; gap: 5px; }
+.status-bar .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.dot-pending { background: var(--border); }
+.dot-completed { background: var(--success); }
+.dot-failed { background: var(--danger); }
+.status-bar .s-val { font-weight: 700; color: var(--primary); }
+.status-bar .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.status-bar .kbd {
+  background: var(--border); padding: 1px 6px; border-radius: 3px;
+  font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .header-top { padding: 6px 12px; flex-wrap: wrap; gap: 8px; }
+  .header-title p { display: none; }
+  .import-bar { padding: 4px 12px 8px; flex-wrap: wrap; }
+  .import-bar textarea { min-width: 60px; height: 32px; font-size: 11px; }
+  .import-or { font-size: 10px; }
+  .toolbar-sticky { padding: 6px 12px; gap: 6px; }
+  .toolbar-sticky .stats { gap: 6px; font-size: 11px; }
+  .toolbar-group .lbl { display: none; }
+  .table-card { margin: 8px 12px; }
+  .col-text { min-width: 100px; }
+  .timeline-toolbar { padding: 4px 12px; }
+  .timeline-scroll-wrap { padding: 4px 12px; }
+  .status-bar { padding: 4px 12px; flex-wrap: wrap; gap: 8px; }
+  .status-bar .right { margin-left: 0; }
+}
+
+@media (max-height: 700px) {
+  :root { --timeline-h: 170px; }
+  .import-bar textarea { height: 32px; }
+  .timeline-inner { min-height: 72px; }
+}
+
+@media (max-height: 600px) {
+  :root { --timeline-h: 150px; }
+  .header-title p { display: none; }
+  .header-top { padding: 4px 12px; }
+  .import-bar { padding: 2px 12px 6px; }
+  .toolbar-sticky { padding: 4px 12px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══════════ HEADER (grid row 1) ══════════ -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-logo">KH</div>
+      <div class="header-title">
+        <h1>Subtitle Audio Editor</h1>
+        <p>Convert Khmer subtitles to natural speech</p>
+      </div>
+      <div class="header-spacer"></div>
+      <a class="btn btn-sm btn-outline" href="/">&larr; Simple TTS</a>
+    </div>
+    <div class="import-bar">
+      <input type="file" accept=".srt" id="srtFile" style="display:none">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('srtFile').click()">&#128193; Upload .srt</button>
+      <span class="import-or">or paste:</span>
+      <textarea id="srtText" placeholder="1&#10;00:00:01,500 --> 00:00:04,000&#10;&#x17E1;&#x17D2;&#x179F;&#x17D2;&#x179F;&#x17B6;!&#10;&#10;Format: HH:MM:SS,mmm --> HH:MM:SS,mmm" rows="2"></textarea>
+      <button class="btn btn-primary btn-sm" id="importBtn" onclick="importSRT()">Import</button>
+    </div>
+  </div>
+
+  <!-- ══════════ SUBTITLE PANEL (grid row 2) ══════════ -->
+  <div class="subtitle-panel">
+
+    <div class="toolbar-sticky" id="toolbarSticky">
+      <span class="tl-pill" id="segCountBadge">0</span>
+      <div class="toolbar-group">
+        <span class="lbl">Voice</span>
+        <button class="btn btn-sm btn-outline" onclick="setAllVoices('km-KH-PisethNeural')">&#9794; Male</button>
+        <button class="btn btn-sm btn-outline" onclick="setAllVoices('km-KH-SreymomNeural')">&#9792; Female</button>
+      </div>
+      <div class="toolbar-group">
+        <button class="btn btn-sm btn-outline" onclick="selectAllToGenerate()">&#9654; All</button>
+        <button class="btn btn-sm btn-outline" onclick="selectPending()">&#8987; Pending</button>
+        <button class="btn btn-sm btn-outline" onclick="selectFailed()">&#9888; Failed</button>
+      </div>
+      <div class="toolbar-group">
+        <input class="num-input" type="number" id="selectNInput" value="5" min="1" max="999">
+        <button class="btn btn-sm btn-outline" onclick="selectNToGenerate()">Select N</button>
+      </div>
+      <span class="spacer"></span>
+      <div class="stats">
+        <span>&#10003; <span class="num" id="statsCompleted">0</span> done</span>
+        <span>&#8987; <span class="num" id="statsPending">0</span> pending</span>
+        <span>&#9888; <span class="num" id="statsFailed">0</span> failed</span>
+        <span id="selectedCount"><span class="num" id="statsSelected">0</span> selected</span>
+      </div>
+      <label class="incl-cb" title="Include completed segments for regeneration">
+        <input type="checkbox" id="inclCompleted"> Include done
+      </label>
+      <button class="btn btn-sm btn-success" id="generateBtn" onclick="generateSelected()">&#9654; Generate</button>
+      <button class="btn btn-sm btn-primary" id="exportBtn" onclick="exportFinal()">&#128190; Export</button>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      <div class="progress-label"><span id="progressText">Starting...</span><span id="progressPct">0%</span></div>
+    </div>
+
+    <div class="toast" id="toast">
+      <span class="toast-icon" id="toastIcon">&#9888;</span>
+      <div class="toast-body">
+        <strong id="toastTitle">Error</strong>
+        <p id="toastDesc"></p>
+      </div>
+    </div>
+
+    <div id="tableArea" class="subtitle-table-wrapper">
+      <div class="empty-box">
+        <div class="empty-icon">&#128196;</div>
+        <strong>No subtitle data yet</strong>
+        <p>Import an .srt file or paste subtitle content to begin.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ TIMELINE PANEL (grid row 3) ══════════ -->
+  <div class="timeline-panel">
+    <div id="timelineSection">
+      <div class="timeline-toolbar">
+        <h2>Timeline</h2>
+        <button class="btn btn-sm btn-outline" id="playTimelineBtn" onclick="togglePlayTimeline()">&#9654; Play All</button>
+      </div>
+      <div class="timeline-scroll-wrap">
+        <div class="timeline-box" id="timelineWrap">
+          <div class="timeline-inner" id="timelineContent">
+            <div class="timeline-tracks">
+              <div class="timeline-ruler" id="ruler"></div>
+              <div class="timeline-row" id="subtitleTrack">
+                <span class="timeline-label">Sub</span>
+              </div>
+              <div class="timeline-row" id="audioTrack">
+                <span class="timeline-label">Aud</span>
+              </div>
+            </div>
+            <div class="playhead-line" id="playhead" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+      <div class="status-bar" id="statusBar">
+        <span class="s-item">Segments: <span class="s-val" id="sbSegments">0</span></span>
+        <span class="s-item"><span class="dot dot-completed"></span> Done: <span class="s-val" id="sbCompleted">0</span></span>
+        <span class="s-item"><span class="dot dot-pending"></span> Pending: <span class="s-val" id="sbPending">0</span></span>
+        <span class="s-item"><span class="dot dot-failed"></span> Failed: <span class="s-val" id="sbFailed">0</span></span>
+        <span class="right" id="jobIdDisplay"></span>
+        <span class="right"><span class="kbd">Space</span> Play / Stop</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const KHMER_CHARS = /[\u1780-\u17FF\u19E0-\u19FF]/;
+const VOICE_MALE = 'km-KH-PisethNeural';
+const VOICE_FEMALE = 'km-KH-SreymomNeural';
+const TIMELINE_SCALE = 0.08;
+
+let state = {
+  jobId: null,
+  segments: [],
+  selectedIndices: new Set(),
+  playheadTime: 0,
+  pollTimer: null,
+  audioPlayer: null,
+  playingIndex: -1,
+  isGenerating: false,
+  isPlayingAll: false,
+  playQueue: [],
+  selectNOffset: 0,
+};
+
+document.getElementById('srtFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('srtText').value = await file.text();
+  importSRT();
+});
+
+function showToast(type, title, desc) {
+  const t = document.getElementById('toast');
+  t.className = 'toast visible toast-' + type;
+  document.getElementById('toastIcon').textContent = type === 'error' ? '\u26A0' : '\u2714';
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastDesc').textContent = desc;
+}
+function hideToast() { document.getElementById('toast').classList.remove('visible'); }
+
+function showProgress(pct, text) {
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = text;
+  document.getElementById('progressPct').textContent = pct + '%';
+}
+function hideProgress() { document.getElementById('progressWrap').classList.remove('visible'); }
+
+function formatTime(ms) {
+  if (ms == null || isNaN(ms)) return '0:00';
+  const s = Math.round(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function handleResponse(res) {
+  const text = await res.text();
+  if (!res.ok) {
+    let msg;
+    try { const j = JSON.parse(text); msg = j.error || j.message || text; }
+    catch { msg = text.slice(0, 200); }
+    throw new Error(msg);
+  }
+  return JSON.parse(text);
+}
+
+async function importSRT() {
+  const srt = document.getElementById('srtText').value.trim();
+  if (!srt) { showToast('error', 'No content', 'Paste SRT content or choose a file.'); return; }
+  hideToast();
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true; btn.textContent = 'Parsing...';
+  try {
+    const data = await handleResponse(await fetch('/api/subtitles/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ srt }),
+    }));
+    if (!data.segments || data.segments.length === 0) throw new Error('No segments found in the SRT content');
+    await createJob(data.segments);
+  } catch (err) {
+    showToast('error', 'Import failed', err.message);
+  }
+  btn.disabled = false; btn.textContent = 'Import';
+}
+
+async function createJob(segments) {
+  const payload = segments.map((s, i) => ({
+    index: i, startTime: s.startTime || 0, endTime: s.endTime || 0,
+    text: s.text || '', voice: VOICE_MALE,
+  }));
+  const data = await handleResponse(await fetch('/api/subtitles/jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ segments: payload }),
+  }));
+  state.jobId = data.id;
+  state.selectedIndices = new Set();
+  state.selectNOffset = 0;
+  state.playheadTime = 0;
+  showToast('success', 'Imported', segments.length + ' subtitle segment(s) loaded.');
+  setTimeout(hideToast, 3000);
+  await loadJob();
+}
+
+async function loadJob() {
+  if (!state.jobId) return;
+  const job = await handleResponse(await fetch('/api/subtitles/jobs/' + state.jobId));
+  state.segments = job.segments || [];
+  const prev = new Set();
+  for (const idx of state.selectedIndices) if (idx < state.segments.length) prev.add(idx);
+  if (prev.size === 0) for (const s of state.segments) prev.add(s.index);
+  state.selectedIndices = prev;
+  renderTable();
+  renderTimeline();
+  updateStats();
+  hideProgress();
+}
+
+function renderTable() {
+  const area = document.getElementById('tableArea');
+  const segs = state.segments;
+  if (!segs || segs.length === 0) {
+    area.innerHTML = '<div class="empty-box"><div class="empty-icon">\uD83D\uDCC4</div><strong>No subtitle data yet</strong><p>Import an .srt file or paste subtitle content to begin.</p></div>';
+    document.getElementById('timelineSection').classList.remove('visible');
+    document.getElementById('statusBar').style.display = 'none';
+    return;
+  }
+  document.getElementById('timelineSection').classList.add('visible');
+  document.getElementById('statusBar').style.display = 'flex';
+
+  let html = '<div class="table-card"><div class="table-scroll"><table><thead><tr>' +
+    '<th class="col-check"><input type="checkbox" onchange="toggleAllCheckboxes(this.checked)" ' + (state.selectedIndices.size === segs.length ? 'checked' : '') + '></th>' +
+    '<th class="col-idx">#</th>' +
+    '<th class="col-time">Start</th>' +
+    '<th class="col-time">End</th>' +
+    '<th class="col-text">Khmer Text</th>' +
+    '<th class="col-voice">Voice</th>' +
+    '<th class="col-status">Status</th>' +
+    '<th class="col-play"></th>' +
+    '</tr></thead><tbody>';
+
+  for (const seg of segs) {
+    const checked = state.selectedIndices.has(seg.index) ? 'checked' : '';
+    const selected = state.selectedIndices.has(seg.index) ? ' selected' : '';
+    const activeRow = state.playingIndex === seg.index ? ' active-row' : '';
+
+    let badge = '';
+    if (seg.status === 'pending') badge = '<span class="badge badge-pending">Pending</span>';
+    else if (seg.status === 'generating') badge = '<span class="badge badge-generating">Generating\u2026</span>';
+    else if (seg.status === 'completed') {
+      const spd = seg.speedRatio && seg.speedRatio !== 1.0 ? ' ' + seg.speedRatio.toFixed(1) + 'x' : '';
+      badge = '<span class="badge badge-completed">Done' + spd + '</span>';
+    } else if (seg.status === 'failed') badge = '<span class="badge badge-failed">Failed</span>';
+
+    const playDisabled = seg.status !== 'completed' ? 'disabled' : '';
+    const playingClass = state.playingIndex === seg.index ? ' playing' : '';
+    const playIcon = state.playingIndex === seg.index ? '\u23F8' : '\u25B6';
+    const textValid = KHMER_CHARS.test(seg.text) ? '' : ' invalid';
+
+    html += '<tr class="' + selected + activeRow + '" data-index="' + seg.index + '" onclick="selectRow(' + seg.index + ')">' +
+      '<td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" ' + checked + ' onchange="toggleCheckbox(' + seg.index + ', this.checked)"></td>' +
+      '<td class="col-idx">' + (seg.index + 1) + '</td>' +
+      '<td class="col-time"><span class="time-display">' + formatTime(seg.startTime) + '</span></td>' +
+      '<td class="col-time"><span class="time-display">' + formatTime(seg.endTime) + '</span></td>' +
+      '<td class="col-text"><input class="text-input' + textValid + '" value="' + escapeHtml(seg.text) + '" data-index="' + seg.index + '" oninput="updateText(' + seg.index + ', this.value)" onclick="event.stopPropagation()"></td>' +
+      '<td class="col-voice"><select data-index="' + seg.index + '" onchange="updateVoice(' + seg.index + ', this.value)" onclick="event.stopPropagation()">' +
+      '<option value="' + VOICE_MALE + '" ' + (seg.voice === VOICE_MALE ? 'selected' : '') + '>Male</option>' +
+      '<option value="' + VOICE_FEMALE + '" ' + (seg.voice === VOICE_FEMALE ? 'selected' : '') + '>Female</option>' +
+      '</select></td>' +
+      '<td class="col-status">' + badge + '</td>' +
+      '<td class="col-play"><button class="play-circle' + playingClass + '" ' + playDisabled + ' onclick="event.stopPropagation(); playSegment(' + seg.index + ')" title="Play">' + playIcon + '</button></td>' +
+      '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+  area.innerHTML = html;
+}
+
+function renderTimeline() {
+  const segs = state.segments;
+  if (!segs || segs.length === 0) return;
+  const maxEnd = Math.max(...segs.map(s => s.endTime), 10000);
+  const totalWidth = maxEnd * TIMELINE_SCALE + 100;
+
+  const ruler = document.getElementById('ruler');
+  ruler.innerHTML = '';
+  const interval = 5000;
+  for (let t = 0; t <= maxEnd; t += interval) {
+    const x = t * TIMELINE_SCALE;
+    const m = document.createElement('div'); m.className = 'ruler-tick'; m.style.left = x + 'px'; ruler.appendChild(m);
+    const l = document.createElement('div'); l.className = 'ruler-label'; l.style.left = x + 'px'; l.textContent = formatTime(t); ruler.appendChild(l);
+  }
+  ruler.style.width = totalWidth + 'px';
+
+  const subTrack = document.getElementById('subtitleTrack');
+  subTrack.innerHTML = '<span class="timeline-label">Sub</span>';
+  subTrack.style.width = totalWidth + 'px'; subTrack.style.position = 'relative';
+
+  const audTrack = document.getElementById('audioTrack');
+  audTrack.innerHTML = '<span class="timeline-label">Aud</span>';
+  audTrack.style.width = totalWidth + 'px'; audTrack.style.position = 'relative';
+
+  let selIdx = -1;
+  if (state.selectedIndices.size === 1) selIdx = [...state.selectedIndices][0];
+
+  for (const seg of segs) {
+    const left = seg.startTime * TIMELINE_SCALE;
+    const width = Math.max((seg.endTime - seg.startTime) * TIMELINE_SCALE, 4);
+    const isSel = seg.index === selIdx;
+
+    const sb = document.createElement('div');
+    sb.className = 'tl-block tl-sub' + (isSel ? ' selected' : '');
+    sb.style.left = left + 'px'; sb.style.width = width + 'px';
+    sb.textContent = seg.text.slice(0, Math.floor(width / 7)) + (seg.text.length > Math.floor(width / 7) ? '\u2026' : '');
+    sb.title = '#' + (seg.index + 1) + ': ' + seg.text;
+    sb.onclick = () => { selectRow(seg.index); movePlayhead(seg.startTime); };
+    subTrack.appendChild(sb);
+
+    const ab = document.createElement('div');
+    if (seg.status === 'completed') {
+      const isPlaying = state.playingIndex === seg.index;
+      ab.className = 'tl-block tl-aud' + (isSel ? ' selected' : '') + (isPlaying ? ' playing' : ' can-play');
+      ab.style.left = left + 'px'; ab.style.width = width + 'px';
+      const playIcon = isPlaying ? '\u23F8' : '\u25B6';
+      const speedText = seg.speedRatio && seg.speedRatio !== 1.0 ? ' ' + seg.speedRatio.toFixed(1) + 'x' : '';
+      ab.innerHTML = '<span style="font-size:11px;margin-right:2px">' + playIcon + '</span>' + speedText;
+      ab.title = 'Click to ' + (isPlaying ? 'stop' : 'play') + ' segment ' + (seg.index + 1);
+      ab.onclick = (e) => { e.stopPropagation(); selectRow(seg.index); movePlayhead(seg.startTime); playSegment(seg.index); };
+    } else {
+      ab.className = 'tl-block tl-empty';
+      ab.style.left = left + 'px'; ab.style.width = width + 'px';
+      ab.textContent = '\u2014';
+      ab.onclick = () => { selectRow(seg.index); movePlayhead(seg.startTime); };
+    }
+    audTrack.appendChild(ab);
+  }
+  updatePlayhead();
+}
+
+function updatePlayhead() {
+  const ph = document.getElementById('playhead');
+  if (state.playheadTime >= 0) { ph.style.display = 'block'; ph.style.left = (state.playheadTime * TIMELINE_SCALE) + 'px'; }
+  else ph.style.display = 'none';
+}
+
+function movePlayhead(time) { state.playheadTime = Math.max(0, time); updatePlayhead(); }
+
+function selectRow(index) {
+  state.selectedIndices.clear();
+  state.selectedIndices.add(index);
+  movePlayhead(state.segments[index].startTime);
+  renderTable();
+  renderTimeline();
+  updateStats();
+}
+
+function toggleCheckbox(index, checked) {
+  if (checked) state.selectedIndices.add(index);
+  else state.selectedIndices.delete(index);
+  updateStats();
+}
+function toggleAllCheckboxes(checked) {
+  if (checked) for (const s of state.segments) state.selectedIndices.add(s.index);
+  else state.selectedIndices.clear();
+  updateStats();
+  renderTimeline();
+}
+function updateText(index, value) {
+  const seg = state.segments[index];
+  if (!seg) return;
+  seg.text = value;
+  const inp = document.querySelector('.text-input[data-index="' + index + '"]');
+  if (inp) { if (KHMER_CHARS.test(value)) inp.classList.remove('invalid'); else inp.classList.add('invalid'); }
+  renderTimeline();
+}
+function updateVoice(index, value) {
+  const seg = state.segments[index];
+  if (seg) seg.voice = value;
+}
+function setAllVoices(voice) {
+  for (const seg of state.segments) seg.voice = voice;
+  renderTable();
+}
+
+function selectPending() {
+  state.selectedIndices = new Set();
+  for (const s of state.segments) {
+    if (s.status === 'pending') state.selectedIndices.add(s.index);
+  }
+  renderTable();
+  renderTimeline();
+  updateStats();
+}
+
+function selectFailed() {
+  state.selectedIndices = new Set();
+  for (const s of state.segments) {
+    if (s.status === 'failed') state.selectedIndices.add(s.index);
+  }
+  renderTable();
+  renderTimeline();
+  updateStats();
+}
+
+function selectAllToGenerate() {
+  state.selectedIndices = new Set();
+  for (const s of state.segments) {
+    if (s.status !== 'completed') state.selectedIndices.add(s.index);
+  }
+  renderTable();
+  renderTimeline();
+  updateStats();
+}
+
+function selectNToGenerate() {
+  const n = parseInt(document.getElementById('selectNInput').value) || 5;
+  const pendings = state.segments
+    .filter(s => s.status === 'pending')
+    .sort((a, b) => a.index - b.index);
+  if (pendings.length === 0) {
+    state.selectNOffset = 0;
+    state.selectedIndices = new Set();
+    renderTable();
+    renderTimeline();
+    updateStats();
+    return;
+  }
+  const offset = Math.min(state.selectNOffset, pendings.length - 1);
+  const chosen = [];
+  for (let i = 0; i < n; i++) {
+    const idx = (offset + i) % pendings.length;
+    if (chosen.some(c => c.index === pendings[idx].index)) break;
+    chosen.push(pendings[idx]);
+  }
+  state.selectedIndices = new Set(chosen.map(c => c.index));
+  state.selectNOffset = (offset + n) % pendings.length;
+  renderTable();
+  renderTimeline();
+  updateStats();
+}
+
+function updateGenerateBtn() {
+  const btn = document.getElementById('generateBtn');
+  if (state.isGenerating || btn.disabled) return;
+  const inclCompleted = document.getElementById('inclCompleted').checked;
+  const count = [...state.selectedIndices].filter(i => {
+    const seg = state.segments[i];
+    if (!seg) return false;
+    if (seg.status === 'completed' && !inclCompleted) return false;
+    return true;
+  }).length;
+  btn.innerHTML = count > 0 ? `\u25B6 Generate (${count})` : '\u25B6 Generate';
+}
+
+function updateStats() {
+  const segs = state.segments;
+  const total = segs.length;
+  const completed = segs.filter(s => s.status === 'completed').length;
+  const failed = segs.filter(s => s.status === 'failed').length;
+  const pending = total - completed - failed;
+  const selCount = state.selectedIndices.size;
+
+  document.getElementById('segCountBadge').textContent = total;
+  document.getElementById('statsCompleted').textContent = completed;
+  document.getElementById('statsPending').textContent = pending;
+  document.getElementById('statsFailed').textContent = failed;
+  document.getElementById('statsSelected').textContent = selCount;
+  document.getElementById('selectedCount').style.display = selCount > 0 ? '' : 'none';
+  document.getElementById('sbSegments').textContent = total;
+  document.getElementById('sbCompleted').textContent = completed;
+  document.getElementById('sbPending').textContent = pending;
+  document.getElementById('sbFailed').textContent = failed;
+
+  const jid = document.getElementById('jobIdDisplay');
+  if (state.jobId) jid.textContent = 'Job: ' + state.jobId.slice(0, 8) + '\u2026';
+  else jid.textContent = '';
+
+  updateGenerateBtn();
+}
+
+async function generateSelected() {
+  if (state.isGenerating) return;
+  const inclCompleted = document.getElementById('inclCompleted').checked;
+  const indices = [...state.selectedIndices].filter(i => {
+    const seg = state.segments[i];
+    if (!seg) return false;
+    if (seg.status === 'completed' && !inclCompleted) return false;
+    return true;
+  });
+  if (indices.length === 0) {
+    showToast('error', 'Nothing to generate', inclCompleted ? 'No selected segments to generate.' : 'All selected segments are already completed. Check "Include done" or select pending/failed segments.');
+    return;
+  }
+
+  hideToast();
+  state.isGenerating = true;
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating (' + indices.length + ')...';
+  showProgress(0, 'Starting generation for ' + indices.length + ' segment(s)...');
+
+  const updatedSegments = state.segments.map(s => ({ index: s.index, text: s.text, voice: s.voice }));
+  try {
+    await handleResponse(await fetch('/api/subtitles/segments/' + state.jobId + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ indices, segments: updatedSegments }),
+    }));
+    startPolling(indices.length);
+  } catch (err) {
+    showToast('error', 'Generation failed', err.message);
+    state.isGenerating = false;
+    btn.disabled = false;
+    updateStats();
+    hideProgress();
+  }
+}
+
+function startPolling(totalCount) {
+  if (state.pollTimer) clearInterval(state.pollTimer);
+  state.pollTimer = setInterval(() => pollJob(totalCount), 1000);
+  pollJob(totalCount);
+}
+
+async function pollJob(totalCount) {
+  if (!state.jobId) return;
+  try {
+    const res = await fetch('/api/subtitles/jobs/' + state.jobId);
+    if (!res.ok) { clearInterval(state.pollTimer); state.isGenerating = false; return; }
+    const job = await res.json();
+    state.segments = job.segments || [];
+    renderTable();
+    renderTimeline();
+    updateStats();
+
+    const completed = job.segments.filter(s => s.status === 'completed').length;
+    const failed = job.segments.filter(s => s.status === 'failed').length;
+    const done = completed + failed;
+    const total = totalCount || job.segments.length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    showProgress(pct, 'Processing segment ' + done + ' of ' + total + '...');
+
+    const allDone = job.segments.every(s => s.status === 'completed' || s.status === 'failed');
+    if (allDone) {
+      clearInterval(state.pollTimer);
+      state.pollTimer = null;
+      state.isGenerating = false;
+      hideProgress();
+
+      for (const seg of job.segments) {
+        if (seg.status === 'completed') state.selectedIndices.delete(seg.index);
+      }
+      renderTimeline();
+      updateStats();
+
+      if (failed > 0) {
+        showToast('error', 'Generation completed with errors', failed + ' segment(s) failed out of ' + total + '.');
+      } else {
+        showToast('success', 'Generation complete', 'All ' + completed + ' segment(s) generated successfully.');
+        setTimeout(hideToast, 3000);
+      }
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = false;
+    }
+  } catch {
+    clearInterval(state.pollTimer);
+    state.isGenerating = false;
+    hideProgress();
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = false;
+    updateStats();
+  }
+}
+
+function togglePlayTimeline() {
+  if (state.isPlayingAll) { stopPlayback(); return; }
+  const queue = state.segments.filter(s => s.status === 'completed').sort((a, b) => a.index - b.index);
+  if (queue.length === 0) { showToast('error', 'Nothing to play', 'No completed segments to play.'); return; }
+  hideToast();
+  state.isPlayingAll = true;
+  state.playQueue = queue;
+  state.playQueueIndex = 0;
+  updatePlayAllBtn();
+  playNextInQueue();
+}
+
+function playNextInQueue() {
+  if (!state.isPlayingAll || state.playQueueIndex >= state.playQueue.length) { stopPlayback(); return; }
+  const seg = state.playQueue[state.playQueueIndex];
+  movePlayhead(seg.startTime);
+  state.playingIndex = seg.index;
+  renderTable();
+  renderTimeline();
+  fetch('/api/subtitles/segments/' + state.jobId + '/audio?index=' + seg.index)
+    .then(async res => {
+      if (!res.ok) throw new Error('Audio not available');
+      return res.blob();
+    })
+    .then(blob => {
+      if (!state.isPlayingAll) return;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      state.audioPlayer = audio;
+      audio.onended = () => { state.audioPlayer = null; state.playQueueIndex++; playNextInQueue(); };
+      audio.play().catch(() => { state.playQueueIndex++; playNextInQueue(); });
+    })
+    .catch(() => { state.playQueueIndex++; playNextInQueue(); });
+}
+
+function stopPlayback() {
+  if (state.audioPlayer) { state.audioPlayer.pause(); state.audioPlayer = null; }
+  state.isPlayingAll = false;
+  state.playQueue = [];
+  state.playQueueIndex = 0;
+  state.playingIndex = -1;
+  updatePlayAllBtn();
+  renderTable();
+  renderTimeline();
+}
+
+function updatePlayAllBtn() {
+  const btn = document.getElementById('playTimelineBtn');
+  if (btn) {
+    btn.innerHTML = state.isPlayingAll ? '\u23F8 Stop' : '\u25B6 Play All';
+    btn.className = 'btn btn-sm ' + (state.isPlayingAll ? 'btn-danger' : 'btn-outline');
+  }
+}
+
+function playSegment(index) {
+  if (state.isPlayingAll) stopPlayback();
+  const seg = state.segments[index];
+  if (!seg || seg.status !== 'completed') return;
+  if (state.audioPlayer) { state.audioPlayer.pause(); state.audioPlayer = null; }
+  if (state.playingIndex === index) { state.playingIndex = -1; renderTable(); renderTimeline(); return; }
+  state.playingIndex = index;
+  renderTable();
+  renderTimeline();
+  fetch('/api/subtitles/segments/' + state.jobId + '/audio?index=' + index)
+    .then(async res => {
+      if (!res.ok) { const t = await res.text().catch(() => 'Unknown'); throw new Error(t.slice(0, 200)); }
+      return res.blob();
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      state.audioPlayer = audio;
+      audio.onended = () => { state.playingIndex = -1; state.audioPlayer = null; renderTable(); renderTimeline(); };
+      audio.play().catch(() => {});
+    })
+    .catch(err => { showToast('error', 'Playback failed', err.message); state.playingIndex = -1; renderTable(); renderTimeline(); });
+}
+
+async function exportFinal() {
+  if (!state.jobId) { showToast('error', 'No job', 'No job to export. Import subtitles first.'); return; }
+  hideToast();
+  const done = state.segments.filter(s => s.status === 'completed').length;
+  if (done === 0) { showToast('error', 'Nothing to export', 'No completed segments to export. Generate audio first.'); return; }
+
+  const btn = document.getElementById('exportBtn');
+  btn.disabled = true;
+  btn.textContent = '\u23F3 Exporting...';
+  try {
+    const data = await handleResponse(await fetch('/api/subtitles/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: state.jobId }),
+    }));
+    const a = document.createElement('a');
+    a.href = data.downloadUrl;
+    a.download = 'subtitles-final.mp3';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('success', 'Exported', 'Final MP3 downloaded successfully.');
+    setTimeout(hideToast, 3000);
+  } catch (err) { showToast('error', 'Export failed', err.message); }
+  btn.disabled = false;
+  btn.textContent = '\uD83D\uDCBE Export';
+}
+
+document.getElementById('timelineWrap').addEventListener('click', function(e) {
+  const wrap = this.querySelector('.timeline-inner');
+  const rect = wrap.getBoundingClientRect();
+  const x = e.clientX - rect.left + this.scrollLeft - 56;
+  if (x < 0) return;
+  movePlayhead(x / TIMELINE_SCALE);
+});
+
+document.getElementById('inclCompleted').addEventListener('change', function() {
+  updateGenerateBtn();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === ' ' && state.segments.length > 0 && state.selectedIndices.size === 1) {
+    e.preventDefault();
+    playSegment([...state.selectedIndices][0]);
+  }
+});
+</script>
+</body>
+</html>

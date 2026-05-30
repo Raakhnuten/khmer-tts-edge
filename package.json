@@ -1,0 +1,22 @@
+{
+  "name": "text-to-speech",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "voices": "tsx src/index.ts voices",
+    "generate": "tsx src/index.ts generate",
+    "serve": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@andresaya/edge-tts": "^1.8.0",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
+}

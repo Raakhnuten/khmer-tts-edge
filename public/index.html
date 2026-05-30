@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Khmer TTS — បម្លែងអក្សរជាសំឡេង</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
+    background: linear-gradient(135deg, #0f0525 0%, #2d1b69 50%, #1a0a3e 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .card {
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 680px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  h1 {
+    font-size: 26px;
+    color: #1a0a3e;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 24px;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 6px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    padding: 14px 16px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    font-size: 16px;
+    font-family: 'Leelawadee UI', 'Khmer OS', 'MoolBoran', 'Noto Sans Khmer', 'Segoe UI', sans-serif;
+    resize: vertical;
+    transition: border-color 0.2s;
+    line-height: 1.7;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: #7c3aed;
+  }
+  .voice-group {
+    display: flex;
+    gap: 12px;
+    margin: 12px 0 20px;
+    flex-wrap: wrap;
+  }
+  .voice-option {
+    flex: 1;
+    min-width: 160px;
+    padding: 16px 20px;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    background: #fafafa;
+  }
+  .voice-option:hover {
+    border-color: #a78bfa;
+    background: #f5f3ff;
+  }
+  .voice-option.selected {
+    border-color: #7c3aed;
+    background: #ede9fe;
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+  }
+  .voice-option .name {
+    font-weight: 700;
+    font-size: 16px;
+    color: #1a0a3e;
+  }
+  .voice-option .gender {
+    font-size: 13px;
+    color: #888;
+    margin-top: 3px;
+  }
+  button.btn-generate {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #7c3aed;
+    color: #fff;
+  }
+  button.btn-generate:hover { background: #6d28d9; }
+  button.btn-generate:disabled {
+    background: #c4b5fd;
+    cursor: not-allowed;
+  }
+  .spinner {
+    display: none;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  button.loading .spinner { display: inline-block; }
+  button.loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .audio-section {
+    display: none;
+    margin-top: 20px;
+    padding: 18px;
+    background: #f5f3ff;
+    border-radius: 12px;
+    border: 1px solid #e9d5ff;
+  }
+  .audio-section.visible { display: block; }
+  audio {
+    width: 100%;
+    margin-top: 8px;
+    border-radius: 8px;
+  }
+  .download-link {
+    display: inline-block;
+    margin-top: 10px;
+    color: #7c3aed;
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .download-link:hover { text-decoration: underline; }
+  .error {
+    display: none;
+    margin-top: 12px;
+    padding: 12px 16px;
+    background: #fef2f2;
+    color: #dc2626;
+    border-radius: 10px;
+    font-size: 14px;
+    border: 1px solid #fecaca;
+  }
+  .error.visible { display: block; }
+  .char-count {
+    text-align: right;
+    font-size: 13px;
+    color: #999;
+    margin-top: 4px;
+  }
+  .footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: #aaa;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .actions button {
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 13px;
+    color: #666;
+    cursor: pointer;
+    width: auto;
+    transition: all 0.2s;
+  }
+  .actions button:hover {
+    border-color: #7c3aed;
+    color: #7c3aed;
+    background: #f5f3ff;
+  }
+  .mode-badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .mode-badge.short { background: #dbeafe; color: #1e40af; }
+  .mode-badge.long { background: #fef3c7; color: #92400e; }
+
+  .progress-section {
+    display: none;
+    margin-top: 20px;
+    padding: 18px;
+    background: #f5f3ff;
+    border-radius: 12px;
+    border: 1px solid #e9d5ff;
+  }
+  .progress-section.visible { display: block; }
+  .progress-bar-bg {
+    width: 100%;
+    height: 10px;
+    background: #e9d5ff;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #7c3aed, #a78bfa);
+    border-radius: 5px;
+    transition: width 0.3s ease;
+  }
+  .progress-status {
+    font-size: 14px;
+    color: #555;
+  }
+  .progress-status strong { color: #1a0a3e; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>Khmer TTS <span style="font-size:16px;color:#888;font-weight:400">— បម្លែងអក្សរជាសំឡេង</span></h1>
+      <div class="subtitle">Convert Khmer text to natural speech using Microsoft Edge TTS</div>
+    </div>
+    <a href="/subtitle-editor.html" style="font-size:13px;color:#7c3aed;text-decoration:none;padding:8px 16px;border:2px solid #7c3aed;border-radius:8px;font-weight:600;white-space:nowrap">&#9654; Subtitle Editor</a>
+  </div>
+
+  <label for="text">Khmer text</label>
+  <textarea id="text" placeholder="Type or paste Khmer text here...&#10;វាយបញ្ចូលអក្សរខ្មែរនៅទីនេះ..."></textarea>
+  <div class="char-count"><span id="charCount">0</span> characters <span id="modeBadge"></span></div>
+  <div class="actions">
+    <button onclick="loadSample()">Load sample text</button>
+    <button onclick="document.getElementById('text').value=''; updateCharCount(); hideError();">Clear</button>
+  </div>
+
+  <div style="margin-top:16px">
+    <label>Voice</label>
+    <div class="voice-group" id="voiceGroup"></div>
+  </div>
+
+  <button id="generateBtn" class="btn-generate" onclick="startGeneration()">
+    <span class="btn-text">Generate Audio</span>
+    <span class="spinner"></span>
+  </button>
+
+  <div class="progress-section" id="progressSection">
+    <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+    <div class="progress-status" id="progressStatus">Starting...</div>
+  </div>
+
+  <div class="audio-section" id="audioSection">
+    <label>Audio result</label>
+    <audio id="audioPlayer" controls></audio>
+    <a class="download-link" id="downloadLink" href="#">Download MP3</a>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+
+  <div class="footer">Khmer TTS &mdash; បម្លែងអក្សរជាសំឡេង</div>
+</div>
+
+<script>
+const SHORT_TEXT_LIMIT = 5000;
+const VOICES = [
+  { name: 'km-KH-PisethNeural', gender: 'Male / បុរស', label: 'Piseth (ពិសិដ្ឋ)' },
+  { name: 'km-KH-SreymomNeural', gender: 'Female / ស្រី', label: 'Sreymom (ស្រីមុំ)' }
+];
+
+let selectedVoice = VOICES[0].name;
+let currentJobId = null;
+let pollTimer = null;
+
+function renderVoices() {
+  const container = document.getElementById('voiceGroup');
+  container.innerHTML = '';
+  VOICES.forEach(v => {
+    const div = document.createElement('div');
+    div.className = 'voice-option' + (v.name === selectedVoice ? ' selected' : '');
+    div.innerHTML = '<div class="name">' + v.label + '</div><div class="gender">' + v.gender + '</div>';
+    div.onclick = () => {
+      selectedVoice = v.name;
+      document.querySelectorAll('.voice-option').forEach(el => el.classList.remove('selected'));
+      div.classList.add('selected');
+    };
+    container.appendChild(div);
+  });
+}
+
+function loadSample() {
+  document.getElementById('text').value =
+    '\u179F\u17D2\u17C0\u179F\u17D2\u178F\u17B8! \u1793\u17D1\u17C7\u1787\u17B6\u1780\u17B6\u179A\u179F\u17B6\u1780\u179B\u17D2\u1794\u17C1\u1784\u1794\u1798\u17D2\u179B\u17C2\u1784\u17A2\u1780\u17D2\u179F\u17D2\u179A\u1781\u17D2\u1798\u17C2\u179A\u1791\u17C4\u1792\u1787\u17B6\u179F\u17D2\u1780\u17C1\u1784\u17A2\u17D2\u1793\u1780\u17D2\u179A\u179F\u17D2\u179A\u17C0\u1799! \u1794\u17B6\u1793\u17D2\u1794\u17D0\u179A\u17B6\u1794\u17D2\u179F\u17B6\u1793\u17CD \u17A2\u17D2\u1793\u1780\u17D2\u179A\u17AD\u1784\u1794\u17D2\u179F\u17D0\u1799\u1794\u17D2\u179F\u17D2\u178F\u17D0\u1799\u1780\u17D2\u179A\u17C0\u1799\u1780\u17D2\u179A\u17C0\u1799 \u1794\u17D2\u179F\u17D0\u1799\u1794\u17D2\u179F\u17D2\u178F\u17D0\u1799\u1780\u17D2\u179A\u17C0\u1799\u1780\u17D2\u179A\u17C0\u1799\u1799\u17D2\u1780\u17C0\u1799 \u1794\u17D2\u179F\u17D0\u1799\u1794\u17D2\u179F\u17D2\u178F\u17D0\u1799\u1780\u17D2\u179A\u17C0\u1799\u1780\u17D2\u179A\u17C0\u1799\u1799\u17D2\u1780\u17C0\u1799\u1799\u17D2\u1780\u17C0\u1799\u1799\u17D2\u1780\u17C0\u1799!';
+  updateCharCount();
+}
+
+function updateCharCount() {
+  const len = document.getElementById('text').value.length;
+  document.getElementById('charCount').textContent = len;
+  const badge = document.getElementById('modeBadge');
+  if (len > SHORT_TEXT_LIMIT) {
+    badge.innerHTML = '<span class="mode-badge long">long audio job</span>';
+  } else {
+    badge.innerHTML = '<span class="mode-badge short">direct generate</span>';
+  }
+}
+
+document.getElementById('text').addEventListener('input', updateCharCount);
+
+async function startGeneration() {
+  hideError();
+  const textEl = document.getElementById('text');
+  const text = textEl.value.trim();
+
+  if (!text) {
+    showError('Please enter some Khmer text');
+    return;
+  }
+
+  const progressSection = document.getElementById('progressSection');
+  const audioSection = document.getElementById('audioSection');
+  const btn = document.getElementById('generateBtn');
+
+  audioSection.classList.remove('visible');
+  progressSection.classList.remove('visible');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  if (text.length <= SHORT_TEXT_LIMIT) {
+    await generateShort(text);
+  } else {
+    await createJob(text);
+  }
+
+  btn.classList.remove('loading');
+  btn.disabled = false;
+}
+
+async function generateShort(text) {
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: selectedVoice })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Generation failed');
+    }
+
+    const blob = await res.blob();
+    showAudio(blob, null);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+async function createJob(text) {
+  try {
+    const res = await fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: selectedVoice })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Job creation failed');
+    }
+
+    const { id } = await res.json();
+    currentJobId = id;
+
+    const progressSection = document.getElementById('progressSection');
+    progressSection.classList.add('visible');
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('progressStatus').textContent = 'Starting...';
+
+    pollTimer = setInterval(() => pollJob(id), 1000);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+async function pollJob(id) {
+  try {
+    const res = await fetch('/api/jobs/' + id);
+    if (!res.ok) {
+      clearInterval(pollTimer);
+      showError('Failed to check job status');
+      return;
+    }
+
+    const job = await res.json();
+    const fill = document.getElementById('progressFill');
+    const status = document.getElementById('progressStatus');
+
+    fill.style.width = job.progress + '%';
+
+    switch (job.status) {
+      case 'processing':
+        if (job.totalChunks > 0) {
+          status.innerHTML = 'Processing chunk <strong>' + job.currentChunk + '</strong> of <strong>' + job.totalChunks + '</strong>';
+        } else {
+          status.textContent = 'Processing...';
+        }
+        break;
+
+      case 'completed':
+        clearInterval(pollTimer);
+        status.textContent = 'Completed! Downloading...';
+        await downloadJobResult(id);
+        break;
+
+      case 'failed':
+        clearInterval(pollTimer);
+        status.textContent = 'Failed';
+        showError(job.error || 'Generation failed');
+        break;
+    }
+  } catch (err) {
+    clearInterval(pollTimer);
+    showError(err.message);
+  }
+}
+
+async function downloadJobResult(id) {
+  try {
+    const res = await fetch('/api/download/' + id);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Download failed');
+    }
+    const blob = await res.blob();
+    showAudio(blob, '/api/download/' + id);
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+function showAudio(blob, downloadUrl) {
+  const url = URL.createObjectURL(blob);
+  const audioPlayer = document.getElementById('audioPlayer');
+  const audioSection = document.getElementById('audioSection');
+  const downloadLink = document.getElementById('downloadLink');
+
+  audioPlayer.src = url;
+  if (downloadUrl) {
+    downloadLink.href = downloadUrl;
+  } else {
+    downloadLink.href = url;
+    downloadLink.download = 'khmer-tts.mp3';
+  }
+  audioSection.classList.add('visible');
+  audioPlayer.play().catch(() => {});
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function hideError() {
+  document.getElementById('errorMsg').classList.remove('visible');
+}
+
+renderVoices();
+updateCharCount();
+</script>
+</body>
+</html>
