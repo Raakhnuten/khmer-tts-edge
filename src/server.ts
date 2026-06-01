@@ -1,11 +1,11 @@
 import express from 'express';
-import { mkdir, readFile, unlink, rmdir } from 'fs/promises';
+import { mkdir, readFile, writeFile, copyFile, unlink, rmdir } from 'fs/promises';
 import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
 import { listAllVoices, isValidKhmerVoice, validateText, SHORT_TEXT_LIMIT } from './voices.js';
 import { generateAudio, ProgressInfo } from './generate.js';
 import {
-  parseSRT, generateSegmentAudio, exportFinalAudio, saveMetadata, formatTimeShort,
+  parseSRT, generateSegmentAudio, exportFinalAudio, saveMetadata, formatTimeShort, getAudioDuration, execFFmpeg,
   SubtitleJobData, SubtitleSegmentData,
 } from './subtitle.js';
 
@@ -308,7 +308,7 @@ app.get('/api/subtitles/segments/:id/audio', async (req, res) => {
 
 app.post('/api/subtitles/export', async (req, res) => {
   try {
-    const { jobId } = req.body;
+    const { jobId, savePath } = req.body;
     if (!jobId) {
       res.status(400).json({ error: 'jobId is required' });
       return;
@@ -332,7 +332,12 @@ app.post('/api/subtitles/export', async (req, res) => {
     try {
       const { gapMode = 'subtitle', smoothMerge = true, crossfadeMs = 20 } = req.body;
       const finalPath = await exportFinalAudio(jobDir, job.segments, adjustedDir, { gapMode, smoothMerge, crossfadeMs });
-      res.json({ exportId: jobId, downloadUrl: `/api/subtitles/export/${jobId}/download` });
+      const resp: any = { exportId: jobId, downloadUrl: `/api/subtitles/export/${jobId}/download` };
+      if (savePath) {
+        await copyFile(finalPath, savePath);
+        resp.savedTo = savePath;
+      }
+      res.json(resp);
     } catch (err: any) {
       res.status(500).json({ error: `Export failed: ${err.message}` });
     }
@@ -351,6 +356,82 @@ app.get('/api/subtitles/export/:id/download', async (req, res) => {
     res.send(audioBuffer);
   } catch {
     res.status(404).json({ error: 'Export not found. Please export first.' });
+  }
+});
+
+app.post('/api/subtitles/preview-completed', async (req, res) => {
+  try {
+    const { jobId } = req.body;
+    if (!jobId) {
+      res.status(400).json({ error: 'jobId is required' });
+      return;
+    }
+
+    const job = subtitleJobs.get(jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Subtitle job not found' });
+      return;
+    }
+
+    const completed = job.segments
+      .filter(s => s.status === 'completed')
+      .sort((a, b) => a.index - b.index);
+
+    if (completed.length === 0) {
+      res.status(400).json({ error: 'No completed segments to preview' });
+      return;
+    }
+
+    const jobDir = join(SUBTITLE_JOBS_DIR, jobId);
+    const adjustedDir = join(jobDir, 'adjusted');
+    const previewFile = join(jobDir, 'preview-completed.mp3');
+    const allFiles: string[] = [];
+
+    for (const seg of completed) {
+      const adjustedPath = join(adjustedDir, `${String(seg.index).padStart(4, '0')}.mp3`);
+      allFiles.push(adjustedPath);
+    }
+
+    if (allFiles.length === 1) {
+      await execFFmpeg(['-i', allFiles[0], '-c', 'copy', '-y', previewFile]);
+    } else {
+      const fileList = join(jobDir, 'preview_files.txt');
+      const entries = allFiles.map(f => `file '${f.replace(/\\/g, '/')}'`);
+      await writeFile(fileList, entries.join('\n'), 'utf-8');
+      await execFFmpeg([
+        '-f', 'concat',
+        '-safe', '0',
+        '-i', fileList,
+        '-c', 'copy',
+        '-y',
+        previewFile,
+      ]);
+      await unlink(fileList).catch(() => {});
+    }
+
+    let duration = 0;
+    try { duration = await getAudioDuration(previewFile); } catch {}
+
+    res.json({
+      success: true,
+      url: `/api/subtitles/preview-completed/${jobId}`,
+      duration: Math.round(duration) / 1000,
+      segmentCount: completed.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/subtitles/preview-completed/:jobId', async (req, res) => {
+  try {
+    const jobId = req.params.jobId;
+    const previewFile = join(SUBTITLE_JOBS_DIR, jobId, 'preview-completed.mp3');
+    const audioBuffer = await readFile(previewFile);
+    res.set('Content-Type', 'audio/mpeg');
+    res.send(audioBuffer);
+  } catch {
+    res.status(404).json({ error: 'Preview not found. Generate completed segments first.' });
   }
 });
 

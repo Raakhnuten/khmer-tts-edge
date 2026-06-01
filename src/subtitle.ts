@@ -375,4 +375,4 @@ export async function exportFinalAudio(
   return finalFile;
 }
 
-export { formatSRTTime };
+export { formatSRTTime, getAudioDuration, execFFmpeg };

@@ -36,6 +36,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: none; -ms-overflow-style: none; }
 *::-webkit-scrollbar { display: none; }
+button { appearance: none; -webkit-appearance: none; border: none; background: none; cursor: pointer; font-family: inherit; }
+input[type="range"] { appearance: none; -webkit-appearance: none; background: none; }
+audio { display: none; }
 
 html, body { width: 100%; height: 100%; margin: 0; }
 
@@ -52,7 +55,7 @@ body {
   width: 100vw;
   height: 100vh;
   display: grid;
-  grid-template-rows: auto 1fr var(--timeline-h);
+  grid-template-rows: auto 1fr auto var(--timeline-h);
   background: var(--card);
 }
 
@@ -193,6 +196,42 @@ body {
 }
 .progress-label { font-size: 12px; color: var(--text-muted); margin-top: 5px; display: flex; justify-content: space-between; }
 
+/* ── EXPORT PATH ROW ── */
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 20px;
+  flex-shrink: 0;
+  background: #fafafa;
+  border-bottom: 1px solid var(--border-light);
+}
+.export-row-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.export-path-input {
+  flex: 1;
+  height: 30px;
+  padding: 4px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  background: #fff;
+  outline: none;
+  min-width: 100px;
+}
+.export-path-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+}
+
 /* ── TOAST ── */
 .toast {
   display: none; align-items: flex-start; gap: 10px;
@@ -206,6 +245,15 @@ body {
 .toast-body p { font-size: 12px; opacity: 0.85; }
 .toast-error { background: var(--danger-light); border-color: #fecaca; color: var(--danger); }
 .toast-success { background: var(--success-light); border-color: #bbf7d0; color: var(--success); }
+.toast-info { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+
+/* ── PLAYER WRAPPER ── */
+.player-wrap {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 20px;
+}
 
 /* ── TABLE WRAPPER (scrollable) ── */
 .subtitle-table-wrapper {
@@ -342,7 +390,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
   overflow-x: auto;
   overflow-y: hidden;
   padding: 4px 20px;
-
+}
 
 .timeline-box {
   position: relative;
@@ -421,6 +469,284 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
   font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);
 }
 
+/* ── SLEEK AUDIO PLAYER ── */
+.sleek-player {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(229,231,235,0.6);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 16px 20px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Source label */
+.sp-source {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+.sp-source.segment { color: var(--primary); }
+.sp-source.export { color: var(--success); }
+.sp-source.preview { color: var(--primary); }
+.sp-source.playing { color: var(--danger); }
+
+/* Time row */
+.sp-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sp-time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
+/* Progress bar */
+.sp-progress {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: #e4e4eb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: height 0.15s ease;
+}
+.sp-progress:hover,
+.sp-progress.dragging {
+  height: 8px;
+}
+.sp-progress-fill {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), #a78bfa);
+  border-radius: 4px;
+  pointer-events: none;
+  overflow: hidden;
+  transition: width 0.1s linear;
+}
+.sp-progress.dragging .sp-progress-fill,
+.sp-progress-fill.nosmooth {
+  transition: none;
+}
+.sp-progress-knob {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0;
+  height: 0;
+  background: #fff;
+  border: 2px solid var(--primary);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(124,58,237,0);
+  transition: width 0.12s ease, height 0.12s ease, box-shadow 0.12s ease;
+}
+.sp-progress:hover .sp-progress-knob,
+.sp-progress.dragging .sp-progress-knob {
+  width: 14px;
+  height: 14px;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.2), 0 1px 4px rgba(0,0,0,0.15);
+}
+.sp-progress-hover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  margin-bottom: 5px;
+}
+.sp-progress:hover .sp-progress-hover {
+  opacity: 1;
+}
+
+/* Buffering shimmer */
+.sp-buffer {
+  display: none;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+.sp-buffer.active { display: block; }
+.sp-buffer::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 200%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: sp-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes sp-shimmer {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(50%); }
+}
+
+/* Controls row */
+.sp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.sp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.sp-btn:active { transform: scale(0.92); }
+.sp-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+
+.sp-btn-play {
+  width: 38px;
+  height: 38px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(124,58,237,0.3);
+}
+.sp-btn-play:hover:not(:disabled) {
+  background: #6d28d9;
+  box-shadow: 0 3px 12px rgba(124,58,237,0.4);
+  transform: scale(1.06);
+}
+.sp-btn-play.playing {
+  background: var(--danger);
+  box-shadow: 0 2px 8px rgba(220,38,38,0.3);
+}
+.sp-btn-play.playing:hover:not(:disabled) {
+  background: #b91c1c;
+  box-shadow: 0 3px 12px rgba(220,38,38,0.4);
+}
+.sp-btn-play:disabled {
+  background: #e4e4eb;
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.sp-btn-stop {
+  width: 30px;
+  height: 30px;
+  background: #f3f4f6;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.sp-btn-stop:hover:not(:disabled) {
+  background: #fef2f2;
+  color: var(--danger);
+  transform: scale(1.06);
+}
+.sp-btn-stop:disabled { background: #f3f4f6; }
+
+.sp-vol-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.sp-vol-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: all 0.12s;
+  flex-shrink: 0;
+}
+.sp-vol-btn:hover { background: #f3f4f6; color: var(--text); }
+
+.sp-vol-slider {
+  width: 54px;
+  height: 4px;
+  border-radius: 2px;
+  background: #e4e4eb;
+  outline: none;
+  cursor: pointer;
+  transition: width 0.15s;
+}
+.sp-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.sp-vol-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.sp-vol-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+.sp-vol-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #e4e4eb;
+}
+.sp-vol-slider:focus::-webkit-slider-thumb { transform: scale(1.1); }
+
+/* ── Responsive tweaks ── */
+@media (max-width: 768px) {
+  .sleek-player { max-width: none; padding: 14px 14px 12px; }
+  .sp-vol-slider { width: 40px; }
+}
+@media (max-height: 700px) {
+  .sleek-player { padding: 12px 16px 10px; gap: 4px; }
+  .sp-btn-play { width: 34px; height: 34px; font-size: 14px; }
+  .sp-btn-stop { width: 26px; height: 26px; font-size: 12px; }
+}
+@media (max-height: 600px) {
+  .sleek-player { padding: 10px 14px 8px; gap: 3px; }
+  .sp-btn-play { width: 30px; height: 30px; font-size: 13px; }
+  .sp-btn-stop { width: 24px; height: 24px; font-size: 11px; }
+  .sp-source { font-size: 10px; }
+  .sp-time { font-size: 12px; }
+  .sp-vol-slider { width: 34px; }
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .header-top { padding: 6px 12px; flex-wrap: wrap; gap: 8px; }
@@ -437,14 +763,14 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
   .timeline-scroll-wrap { padding: 4px 12px; }
   .status-bar { padding: 4px 12px; flex-wrap: wrap; gap: 8px; }
   .status-bar .right { margin-left: 0; }
+  .export-row { padding: 4px 12px; flex-wrap: wrap; }
+  .export-path-input { min-width: 60px; }
 }
-
 @media (max-height: 700px) {
   :root { --timeline-h: 170px; }
   .import-bar textarea { height: 32px; }
   .timeline-inner { min-height: 72px; }
 }
-
 @media (max-height: 600px) {
   :root { --timeline-h: 150px; }
   .header-title p { display: none; }
@@ -474,6 +800,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
       <span class="import-or">or paste:</span>
       <textarea id="srtText" placeholder="1&#10;00:00:01,500 --> 00:00:04,000&#10;&#x17E1;&#x17D2;&#x179F;&#x17D2;&#x179F;&#x17B6;!&#10;&#10;Format: HH:MM:SS,mmm --> HH:MM:SS,mmm" rows="2"></textarea>
       <button class="btn btn-primary btn-sm" id="importBtn" onclick="importSRT()">Import</button>
+      <button class="btn btn-danger btn-sm" onclick="clearSRT()" id="clearBtn" style="display:none">Clear</button>
     </div>
   </div>
 
@@ -508,6 +835,13 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
       </label>
       <button class="btn btn-sm btn-success" id="generateBtn" onclick="generateSelected()">&#9654; Generate</button>
       <button class="btn btn-sm btn-primary" id="exportBtn" onclick="exportFinal()">&#128190; Export</button>
+      <button class="btn btn-sm btn-outline" id="playExportBtn" onclick="playExportAudio()" style="display:none">&#9654; Play Export</button>
+    </div>
+
+    <div class="export-row" id="exportRow" style="display:none">
+      <span class="export-row-label">Save to:</span>
+      <input class="export-path-input" type="text" id="savePath" placeholder="C:\Users\...\output.mp3">
+      <button class="btn btn-sm btn-outline" onclick="browseSavePath()">&#128193; Browse</button>
     </div>
 
     <div class="progress-wrap" id="progressWrap">
@@ -532,7 +866,34 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
     </div>
   </div>
 
-  <!-- ══════════ TIMELINE PANEL (grid row 3) ══════════ -->
+  <!-- ══════════ SLEEK AUDIO PLAYER (grid row 3) ══════════ -->
+  <div class="player-wrap">
+  <div class="sleek-player" id="sleekPlayer">
+    <span class="sp-source" id="spSource">No Audio</span>
+    <div class="sp-time-row">
+      <span class="sp-time" id="spCurrent">00:00</span>
+      <span class="sp-time" id="spDuration">00:00</span>
+    </div>
+    <div class="sp-progress" id="spProgress">
+      <div class="sp-progress-fill" id="spProgressFill">
+        <div class="sp-buffer" id="spBuffer"></div>
+      </div>
+      <div class="sp-progress-knob" id="spProgressKnob"></div>
+      <div class="sp-progress-hover" id="spHoverTime">0:00</div>
+    </div>
+    <div class="sp-controls">
+      <button class="sp-btn sp-btn-play" id="spPlayBtn" disabled>&#9654;</button>
+      <button class="sp-btn sp-btn-stop" id="spStopBtn" disabled>&#9632;</button>
+      <div class="sp-vol-wrap">
+        <button class="sp-vol-btn" id="spVolBtn">&#128266;</button>
+        <input type="range" class="sp-vol-slider" id="spVolSlider" min="0" max="1" step="0.01" value="1">
+      </div>
+    </div>
+    <audio id="sharedAudio" preload="auto"></audio>
+  </div>
+  </div>
+
+  <!-- ══════════ TIMELINE PANEL (grid row 4) ══════════ -->
   <div class="timeline-panel">
     <div id="timelineSection">
       <div class="timeline-toolbar">
@@ -580,12 +941,12 @@ let state = {
   selectedIndices: new Set(),
   playheadTime: 0,
   pollTimer: null,
-  audioPlayer: null,
   playingIndex: -1,
   isGenerating: false,
   isPlayingAll: false,
   playQueue: [],
   selectNOffset: 0,
+  exportUrl: null,
 };
 
 document.getElementById('srtFile').addEventListener('change', async (e) => {
@@ -615,6 +976,11 @@ function hideProgress() { document.getElementById('progressWrap').classList.remo
 function formatTime(ms) {
   if (ms == null || isNaN(ms)) return '0:00';
   const s = Math.round(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function formatTimeFromSeconds(sec) {
+  if (sec == null || isNaN(sec)) return '0:00';
+  const s = Math.floor(sec);
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 function escapeHtml(s) {
@@ -654,6 +1020,30 @@ async function importSRT() {
   btn.disabled = false; btn.textContent = 'Import';
 }
 
+function clearSRT() {
+  if (!confirm('Clear all subtitle data? This cannot be undone.')) return;
+  document.getElementById('srtText').value = '';
+  document.getElementById('srtFile').value = '';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('playExportBtn').style.display = 'none';
+  document.getElementById('exportRow').style.display = 'none';
+  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+  if (state.isPlayingAll) stopPlayback();
+  state.jobId = null;
+  state.segments = [];
+  state.selectedIndices = new Set();
+  state.selectNOffset = 0;
+  state.playheadTime = 0;
+  state.exportUrl = null;
+  state.isGenerating = false;
+  state.playingIndex = -1;
+  resetPlayer();
+  renderTable();
+  renderTimeline();
+  showToast('info', 'Cleared', 'Subtitle data has been cleared.');
+  setTimeout(hideToast, 2000);
+}
+
 async function createJob(segments) {
   const payload = segments.map((s, i) => ({
     index: i, startTime: s.startTime || 0, endTime: s.endTime || 0,
@@ -668,6 +1058,11 @@ async function createJob(segments) {
   state.selectedIndices = new Set();
   state.selectNOffset = 0;
   state.playheadTime = 0;
+  state.exportUrl = null;
+  document.getElementById('playExportBtn').style.display = 'none';
+  document.getElementById('clearBtn').style.display = '';
+  document.getElementById('exportRow').style.display = '';
+  resetPlayer();
   showToast('success', 'Imported', segments.length + ' subtitle segment(s) loaded.');
   setTimeout(hideToast, 3000);
   await loadJob();
@@ -958,7 +1353,7 @@ async function generateSelected() {
     return true;
   });
   if (indices.length === 0) {
-    showToast('error', 'Nothing to generate', inclCompleted ? 'No selected segments to generate.' : 'All selected segments are already completed. Check "Include done" or select pending/failed segments.');
+    showToast('error', 'Nothing to generate', 'Check "Include done" to regenerate completed segments, or select pending/failed segments first.');
     return;
   }
 
@@ -967,6 +1362,7 @@ async function generateSelected() {
   const btn = document.getElementById('generateBtn');
   btn.disabled = true;
   btn.textContent = 'Generating (' + indices.length + ')...';
+  setPlayerGenerating();
   showProgress(0, 'Starting generation for ' + indices.length + ' segment(s)...');
 
   const updatedSegments = state.segments.map(s => ({ index: s.index, text: s.text, voice: s.voice }));
@@ -983,6 +1379,7 @@ async function generateSelected() {
     btn.disabled = false;
     updateStats();
     hideProgress();
+    clearPlayerGenerating();
   }
 }
 
@@ -996,7 +1393,7 @@ async function pollJob(totalCount) {
   if (!state.jobId) return;
   try {
     const res = await fetch('/api/subtitles/jobs/' + state.jobId);
-    if (!res.ok) { clearInterval(state.pollTimer); state.isGenerating = false; return; }
+    if (!res.ok) { clearInterval(state.pollTimer); state.isGenerating = false; clearPlayerGenerating(); return; }
     const job = await res.json();
     state.segments = job.segments || [];
     renderTable();
@@ -1018,8 +1415,10 @@ async function pollJob(totalCount) {
       hideProgress();
 
       for (const seg of job.segments) {
-        if (seg.status === 'completed') state.selectedIndices.delete(seg.index);
+        if (seg.status !== 'completed') state.selectedIndices.add(seg.index);
       }
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = false;
       renderTimeline();
       updateStats();
 
@@ -1029,8 +1428,8 @@ async function pollJob(totalCount) {
         showToast('success', 'Generation complete', 'All ' + completed + ' segment(s) generated successfully.');
         setTimeout(hideToast, 3000);
       }
-      const btn = document.getElementById('generateBtn');
-      btn.disabled = false;
+
+      loadCompletedPreview(false);
     }
   } catch {
     clearInterval(state.pollTimer);
@@ -1039,46 +1438,25 @@ async function pollJob(totalCount) {
     const btn = document.getElementById('generateBtn');
     btn.disabled = false;
     updateStats();
+    clearPlayerGenerating();
   }
 }
 
 function togglePlayTimeline() {
   if (state.isPlayingAll) { stopPlayback(); return; }
-  const queue = state.segments.filter(s => s.status === 'completed').sort((a, b) => a.index - b.index);
-  if (queue.length === 0) { showToast('error', 'Nothing to play', 'No completed segments to play.'); return; }
+  const completed = state.segments.filter(s => s.status === 'completed');
+  if (completed.length === 0) { showToast('error', 'Nothing to play', 'No completed audio to play.'); return; }
   hideToast();
   state.isPlayingAll = true;
-  state.playQueue = queue;
-  state.playQueueIndex = 0;
+  state.playingIndex = -1;
   updatePlayAllBtn();
-  playNextInQueue();
-}
-
-function playNextInQueue() {
-  if (!state.isPlayingAll || state.playQueueIndex >= state.playQueue.length) { stopPlayback(); return; }
-  const seg = state.playQueue[state.playQueueIndex];
-  movePlayhead(seg.startTime);
-  state.playingIndex = seg.index;
   renderTable();
   renderTimeline();
-  fetch('/api/subtitles/segments/' + state.jobId + '/audio?index=' + seg.index)
-    .then(async res => {
-      if (!res.ok) throw new Error('Audio not available');
-      return res.blob();
-    })
-    .then(blob => {
-      if (!state.isPlayingAll) return;
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      state.audioPlayer = audio;
-      audio.onended = () => { state.audioPlayer = null; state.playQueueIndex++; playNextInQueue(); };
-      audio.play().catch(() => { state.playQueueIndex++; playNextInQueue(); });
-    })
-    .catch(() => { state.playQueueIndex++; playNextInQueue(); });
+  loadCompletedPreview(true);
 }
 
 function stopPlayback() {
-  if (state.audioPlayer) { state.audioPlayer.pause(); state.audioPlayer = null; }
+  stopAudio();
   state.isPlayingAll = false;
   state.playQueue = [];
   state.playQueueIndex = 0;
@@ -1100,8 +1478,7 @@ function playSegment(index) {
   if (state.isPlayingAll) stopPlayback();
   const seg = state.segments[index];
   if (!seg || seg.status !== 'completed') return;
-  if (state.audioPlayer) { state.audioPlayer.pause(); state.audioPlayer = null; }
-  if (state.playingIndex === index) { state.playingIndex = -1; renderTable(); renderTimeline(); return; }
+  if (state.playingIndex === index && isPlaying()) { pauseAudio(); return; }
   state.playingIndex = index;
   renderTable();
   renderTimeline();
@@ -1112,12 +1489,27 @@ function playSegment(index) {
     })
     .then(blob => {
       const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      state.audioPlayer = audio;
-      audio.onended = () => { state.playingIndex = -1; state.audioPlayer = null; renderTable(); renderTimeline(); };
-      audio.play().catch(() => {});
+      loadAudio(url, 'segment', index);
+      playAudio();
     })
     .catch(err => { showToast('error', 'Playback failed', err.message); state.playingIndex = -1; renderTable(); renderTimeline(); });
+}
+
+let _saveFileHandle = null;
+
+async function browseSavePath() {
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: 'subtitles-' + (state.jobId ? state.jobId.slice(0, 8) : 'final') + '.mp3',
+      types: [{ description: 'MP3 Audio', accept: { 'audio/mpeg': ['.mp3'] } }],
+    });
+    _saveFileHandle = handle;
+    document.getElementById('savePath').value = handle.name;
+    showToast('info', 'File selected', 'Save location: ' + handle.name);
+    setTimeout(hideToast, 2000);
+  } catch {
+    // User cancelled or API unavailable
+  }
 }
 
 async function exportFinal() {
@@ -1135,18 +1527,341 @@ async function exportFinal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId: state.jobId }),
     }));
-    const a = document.createElement('a');
-    a.href = data.downloadUrl;
-    a.download = 'subtitles-final.mp3';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    showToast('success', 'Exported', 'Final MP3 downloaded successfully.');
-    setTimeout(hideToast, 3000);
+
+    const audioResp = await fetch(data.downloadUrl);
+    const audioBlob = await audioResp.blob();
+
+    if (_saveFileHandle) {
+      const writable = await _saveFileHandle.createWritable();
+      await writable.write(audioBlob);
+      await writable.close();
+      _saveFileHandle = null;
+      showToast('success', 'Exported', 'File saved successfully.');
+      setTimeout(hideToast, 3000);
+    } else {
+      const customPath = document.getElementById('savePath').value.trim();
+      if (customPath) {
+        await fetch('/api/subtitles/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: state.jobId, savePath: customPath }),
+        });
+        showToast('success', 'Exported', 'Saved to: ' + customPath);
+        setTimeout(hideToast, 4000);
+      } else {
+        const a = document.createElement('a');
+        a.href = data.downloadUrl;
+        a.download = 'subtitles-' + state.jobId.slice(0, 8) + '.mp3';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('success', 'Exported', 'Final MP3 downloaded successfully.');
+        setTimeout(hideToast, 3000);
+      }
+    }
+
+    state.exportUrl = data.downloadUrl;
+    document.getElementById('playExportBtn').style.display = '';
+    loadAudio(data.downloadUrl, 'export');
+    playAudio();
   } catch (err) { showToast('error', 'Export failed', err.message); }
   btn.disabled = false;
   btn.textContent = '\uD83D\uDCBE Export';
 }
+
+function playExportAudio() {
+  if (state.exportUrl) {
+    if (state.isPlayingAll) stopPlayback();
+    state.playingIndex = -1;
+    loadAudio(state.exportUrl, 'export');
+    playAudio();
+  }
+}
+
+function setPlayerGenerating() {
+  spSource.className = 'sp-source';
+  spSource.textContent = 'Generating selected audio\u2026';
+}
+
+function clearPlayerGenerating() {
+  if (spSource.textContent === 'Generating selected audio\u2026') {
+    spSource.textContent = 'No Audio';
+  }
+}
+
+async function loadCompletedPreview(autoPlay) {
+  if (!state.jobId) return;
+  try {
+    const data = await handleResponse(await fetch('/api/subtitles/preview-completed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: state.jobId }),
+    }));
+    loadAudio(data.url, 'preview', null, data.segmentCount);
+    if (autoPlay) playAudio();
+  } catch (err) {
+    if (autoPlay) showToast('error', 'Preview unavailable', err.message);
+  }
+}
+
+/* Reusable API for the audio player */
+function createAudioPlayer(container, audioUrl) {
+  if (container) {
+    var existing = container.querySelector('.sleek-player');
+    if (!existing) container.innerHTML = document.getElementById('sleekPlayer').outerHTML;
+  }
+  if (audioUrl) loadAudio(audioUrl);
+  return { loadAudio: loadAudio, playAudio: playAudio, pauseAudio: pauseAudio, stopAudio: stopAudio, formatTime: formatTimeFromSeconds };
+}
+
+/* ── SLEEK AUDIO PLAYER ── */
+const audioEl = document.getElementById('sharedAudio');
+const spPlayBtn = document.getElementById('spPlayBtn');
+const spStopBtn = document.getElementById('spStopBtn');
+const spVolBtn = document.getElementById('spVolBtn');
+const spVolSlider = document.getElementById('spVolSlider');
+const spCurrent = document.getElementById('spCurrent');
+const spDuration = document.getElementById('spDuration');
+const spProgressFill = document.getElementById('spProgressFill');
+const spProgressKnob = document.getElementById('spProgressKnob');
+const spProgress = document.getElementById('spProgress');
+const spSource = document.getElementById('spSource');
+const spHoverTime = document.getElementById('spHoverTime');
+const spBuffer = document.getElementById('spBuffer');
+
+let isDragging = false;
+
+function isPlaying() { return audioEl && !audioEl.paused && !audioEl.ended; }
+
+function updatePlayerUI() {
+  const dur = audioEl.duration || 0;
+  const cur = isDragging ? audioEl._dragTime : audioEl.currentTime;
+  spCurrent.textContent = formatTimeFromSeconds(cur);
+  spDuration.textContent = formatTimeFromSeconds(dur);
+  const pct = dur > 0 ? (cur / dur) * 100 : 0;
+  spProgressFill.style.width = pct + '%';
+  spProgressKnob.style.left = pct + '%';
+}
+
+function loadAudio(url, type, index, segmentCount) {
+  stopAudio();
+  audioEl.src = url;
+  audioEl.load();
+  audioEl._sourceType = type || 'segment';
+  audioEl._segmentIndex = index != null ? index : -1;
+  spPlayBtn.disabled = false;
+  spStopBtn.disabled = false;
+  spBuffer.classList.add('active');
+  spSource.className = 'sp-source';
+  if (type === 'export') {
+    spSource.textContent = 'Final Export';
+    spSource.classList.add('export');
+  } else if (type === 'preview') {
+    const count = segmentCount || 0;
+    spSource.textContent = 'Completed Audio Preview \u00B7 ' + count + ' segment' + (count !== 1 ? 's' : '');
+    spSource.classList.add('preview');
+  } else if (type === 'segment' && index != null) {
+    spSource.textContent = 'Segment #' + (index + 1);
+    spSource.classList.add('segment');
+  } else {
+    spSource.textContent = 'Audio';
+  }
+}
+
+function playAudio() {
+  if (!audioEl.src) return;
+  audioEl.play().catch(function() {});
+}
+
+function pauseAudio() {
+  audioEl.pause();
+  if (state.playingIndex >= 0 && !state.isPlayingAll) {
+    state.playingIndex = -1;
+    renderTable();
+    renderTimeline();
+  }
+}
+
+function stopAudio() {
+  audioEl.pause();
+  audioEl.currentTime = 0;
+  updatePlayerUI();
+}
+
+function resetPlayer() {
+  audioEl.pause();
+  audioEl.removeAttribute('src');
+  audioEl.load();
+  audioEl._sourceType = null;
+  audioEl._segmentIndex = -1;
+  spCurrent.textContent = '00:00';
+  spDuration.textContent = '00:00';
+  spProgressFill.style.width = '0%';
+  spProgressKnob.style.left = '0%';
+  spPlayBtn.disabled = true;
+  spStopBtn.disabled = true;
+  spSource.textContent = 'No Audio';
+  spSource.className = 'sp-source';
+}
+
+function togglePlayPause() {
+  if (isPlaying()) { pauseAudio(); }
+  else { playAudio(); }
+}
+
+function seekAudio(pct) {
+  const dur = audioEl.duration || 0;
+  if (dur > 0) {
+    audioEl.currentTime = (pct / 100) * dur;
+    updatePlayerUI();
+  }
+}
+
+/* Audio element events */
+audioEl.addEventListener('loadedmetadata', function() {
+  updatePlayerUI();
+  spBuffer.classList.remove('active');
+});
+
+audioEl.addEventListener('canplay', function() {
+  spBuffer.classList.remove('active');
+});
+
+audioEl.addEventListener('waiting', function() {
+  if (!audioEl.paused) spBuffer.classList.add('active');
+});
+
+audioEl.addEventListener('timeupdate', function() {
+  if (!isDragging) {
+    spProgressFill.classList.remove('nosmooth');
+    updatePlayerUI();
+    if (audioEl._sourceType === 'segment' && audioEl._segmentIndex >= 0) {
+      const seg = state.segments[audioEl._segmentIndex];
+      if (seg) {
+        const phTime = seg.startTime + audioEl.currentTime * 1000;
+        movePlayhead(phTime);
+      }
+    }
+  }
+});
+
+audioEl.addEventListener('ended', function() {
+  spPlayBtn.innerHTML = '\u25B6';
+  spPlayBtn.classList.remove('playing');
+  spBuffer.classList.remove('active');
+  if (state.isPlayingAll) {
+    state.isPlayingAll = false;
+    updatePlayAllBtn();
+  }
+  if (audioEl._sourceType !== 'export') {
+    state.playingIndex = -1;
+    renderTable();
+    renderTimeline();
+  }
+});
+
+audioEl.addEventListener('play', function() {
+  spPlayBtn.innerHTML = '\u23F8';
+  spPlayBtn.classList.add('playing');
+  spSource.classList.add('playing');
+});
+
+audioEl.addEventListener('pause', function() {
+  spPlayBtn.innerHTML = '\u25B6';
+  spPlayBtn.classList.remove('playing');
+  spSource.classList.remove('playing');
+  spBuffer.classList.remove('active');
+});
+
+/* Play button */
+spPlayBtn.addEventListener('click', togglePlayPause);
+
+/* Stop button */
+spStopBtn.addEventListener('click', function() {
+  if (state.isPlayingAll) { stopPlayback(); }
+  else {
+    stopAudio();
+    state.playingIndex = -1;
+    renderTable();
+    renderTimeline();
+  }
+});
+
+/* Volume button (toggle mute) */
+spVolBtn.addEventListener('click', function() {
+  audioEl.muted = !audioEl.muted;
+  spVolBtn.textContent = audioEl.muted || audioEl.volume === 0 ? '\uD83D\uDD07' : '\uD83D\uDD0A';
+  spVolSlider.value = audioEl.muted ? 0 : audioEl.volume;
+});
+
+/* Volume slider */
+spVolSlider.addEventListener('input', function() {
+  audioEl.muted = false;
+  audioEl.volume = parseFloat(this.value);
+  spVolBtn.textContent = audioEl.volume === 0 ? '\uD83D\uDD07' : '\uD83D\uDD0A';
+});
+
+/* Progress bar click to seek */
+spProgress.addEventListener('click', function(e) {
+  if (isDragging) return;
+  const rect = this.getBoundingClientRect();
+  const pct = ((e.clientX - rect.left) / rect.width) * 100;
+  seekAudio(Math.max(0, Math.min(100, pct)));
+});
+
+/* Progress bar hover time tooltip */
+spProgress.addEventListener('mousemove', function(e) {
+  const rect = this.getBoundingClientRect();
+  const pct = ((e.clientX - rect.left) / rect.width) * 100;
+  const dur = audioEl.duration || 0;
+  const hoverSec = (pct / 100) * dur;
+  spHoverTime.textContent = formatTimeFromSeconds(hoverSec);
+  spHoverTime.style.left = Math.max(0, Math.min(100, pct)) + '%';
+});
+
+/* Progress bar drag to seek */
+spProgress.addEventListener('mousedown', function(e) {
+  isDragging = true;
+  spProgress.classList.add('dragging');
+  spProgressFill.classList.add('nosmooth');
+  const rect = this.getBoundingClientRect();
+  const pct = ((e.clientX - rect.left) / rect.width) * 100;
+  audioEl._dragTime = (pct / 100) * (audioEl.duration || 0);
+  updatePlayerUI();
+
+  function onMove(ev) {
+    const r = spProgress.getBoundingClientRect();
+    const p = ((ev.clientX - r.left) / r.width) * 100;
+    const clamped = Math.max(0, Math.min(100, p));
+    audioEl._dragTime = (clamped / 100) * (audioEl.duration || 0);
+    spHoverTime.textContent = formatTimeFromSeconds(audioEl._dragTime);
+    spHoverTime.style.left = clamped + '%';
+    updatePlayerUI();
+  }
+
+  function onUp(ev) {
+    isDragging = false;
+    spProgress.classList.remove('dragging');
+    spProgressFill.classList.remove('nosmooth');
+    const r = spProgress.getBoundingClientRect();
+    const p = ((ev.clientX - r.left) / r.width) * 100;
+    seekAudio(Math.max(0, Math.min(100, p)));
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  e.preventDefault();
+});
+
+/* Space key: use shared player */
+document.addEventListener('keydown', function(e) {
+  if (e.key === ' ' && state.segments.length > 0 && state.selectedIndices.size === 1) {
+    e.preventDefault();
+    playSegment([...state.selectedIndices][0]);
+  }
+});
 
 document.getElementById('timelineWrap').addEventListener('click', function(e) {
   const wrap = this.querySelector('.timeline-inner');
@@ -1158,13 +1873,6 @@ document.getElementById('timelineWrap').addEventListener('click', function(e) {
 
 document.getElementById('inclCompleted').addEventListener('change', function() {
   updateGenerateBtn();
-});
-
-document.addEventListener('keydown', function(e) {
-  if (e.key === ' ' && state.segments.length > 0 && state.selectedIndices.size === 1) {
-    e.preventDefault();
-    playSegment([...state.selectedIndices][0]);
-  }
 });
 </script>
 </body>
