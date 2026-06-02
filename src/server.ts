@@ -1,6 +1,7 @@
 import express from 'express';
-import { mkdir, readFile, writeFile, copyFile, unlink, rmdir } from 'fs/promises';
-import { join, resolve } from 'path';
+import { createReadStream } from 'fs';
+import { mkdir, readFile, writeFile, copyFile, unlink, rmdir, stat } from 'fs/promises';
+import { join, resolve, basename } from 'path';
 import { randomUUID } from 'crypto';
 import { listAllVoices, isValidKhmerVoice, validateText, SHORT_TEXT_LIMIT } from './voices.js';
 import { generateAudio, ProgressInfo } from './generate.js';
@@ -8,6 +9,21 @@ import {
   parseSRT, generateSegmentAudio, exportFinalAudio, saveMetadata, formatTimeShort, getAudioDuration, execFFmpeg,
   SubtitleJobData, SubtitleSegmentData,
 } from './subtitle.js';
+
+const MAX_SRT_SIZE = 5 * 1024 * 1024; // 5MB max SRT upload
+const EXPORT_FILENAME_REGEX = /^[a-zA-Z0-9_\-.\u1780-\u17FF\u19E0-\u19FF ()]+$/;
+
+function sanitizeFilename(name: string): string {
+  let safe = name.trim();
+  if (!safe.toLowerCase().endsWith('.mp3')) safe += '.mp3';
+  safe = safe.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  if (safe.length > 255) safe = safe.slice(0, 255);
+  return safe;
+}
+
+function isValidExportFilename(name: string): boolean {
+  return EXPORT_FILENAME_REGEX.test(basename(name, '.mp3').replace(/\.mp3$/, ''));
+}
 
 interface Job {
   id: string;
@@ -32,8 +48,11 @@ const SUBTITLE_JOBS_DIR = join(OUTPUT_DIR, 'subtitle-jobs');
 
 app.use(express.json({ limit: '5mb' }));
 
-app.use((req, _res, next) => {
-  console.log(`[API] ${req.method} ${req.path}`);
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    console.log(`[API] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
+  });
   next();
 });
 
@@ -162,10 +181,12 @@ app.get('/api/download/:id', async (req, res) => {
     return;
   }
   try {
-    const audioBuffer = await readFile(job.outputPath);
-    res.set('Content-Type', 'audio/mpeg');
-    res.set('Content-Disposition', `attachment; filename="khmer-tts-${job.id.slice(0, 8)}.mp3"`);
-    res.send(audioBuffer);
+    const fileStat = await stat(job.outputPath);
+    if (fileStat.size === 0) {
+      res.status(500).json({ error: 'Generated audio file is empty' });
+      return;
+    }
+    streamFile(res, job.outputPath, `khmer-tts-${job.id.slice(0, 8)}.mp3`, 'audio/mpeg', 'attachment');
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -180,14 +201,18 @@ app.post('/api/subtitles/import', async (req, res) => {
       res.status(400).json({ error: 'SRT content is required' });
       return;
     }
+    if (srt.length > MAX_SRT_SIZE) {
+      res.status(400).json({ error: `SRT content too large (${(srt.length / 1024 / 1024).toFixed(1)}MB). Maximum is ${MAX_SRT_SIZE / 1024 / 1024}MB.` });
+      return;
+    }
     const parsed = parseSRT(srt);
     if (parsed.length === 0) {
-      res.status(400).json({ error: 'No valid subtitle blocks found in SRT' });
+      res.status(400).json({ error: 'No valid subtitle blocks found in SRT. Check your format (HH:MM:SS,mmm --> HH:MM:SS,mmm).' });
       return;
     }
     res.json({ segments: parsed });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: `SRT import failed: ${err.message}` });
   }
 });
 
@@ -261,11 +286,6 @@ app.post('/api/subtitles/segments/:id/generate', async (req, res) => {
       }
     }
 
-    for (const idx of indices) {
-      const seg = job.segments[idx];
-      if (seg) seg.status = 'pending';
-    }
-
     job.status = 'processing';
     const jobDir = join(SUBTITLE_JOBS_DIR, jobId);
     await saveMetadata(jobDir, job);
@@ -278,10 +298,29 @@ app.post('/api/subtitles/segments/:id/generate', async (req, res) => {
   }
 });
 
+function streamFile(res: any, filePath: string, filename: string, contentType: string, dispositionType: string = 'inline'): void {
+  const stream = createReadStream(filePath);
+  stream.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') {
+      if (!res.headersSent) res.status(404).json({ error: 'File not found' });
+    } else if (!res.headersSent) {
+      res.status(500).json({ error: `Failed to read file: ${err.message}` });
+    }
+  });
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `${dispositionType}; filename="${filename}"`);
+  res.setHeader('Cache-Control', 'no-store');
+  stream.pipe(res);
+}
+
 app.get('/api/subtitles/segments/:id/audio', async (req, res) => {
   try {
     const jobId = req.params.id;
     const index = parseInt(req.query.index as string);
+    if (isNaN(index) || index < 0) {
+      res.status(400).json({ error: 'Invalid segment index' });
+      return;
+    }
     const job = subtitleJobs.get(jobId);
     if (!job) {
       res.status(404).json({ error: 'Subtitle job not found' });
@@ -289,7 +328,7 @@ app.get('/api/subtitles/segments/:id/audio', async (req, res) => {
     }
     const seg = job.segments[index];
     if (!seg || seg.status !== 'completed') {
-      res.status(400).json({ error: 'Segment audio not available' });
+      res.status(400).json({ error: 'Segment audio not available. Generate the segment first.' });
       return;
     }
 
@@ -297,10 +336,13 @@ app.get('/api/subtitles/segments/:id/audio', async (req, res) => {
     const chunkName = `${String(index).padStart(4, '0')}.mp3`;
     const filePath = join(adjustedDir, chunkName);
 
-    const audioBuffer = await readFile(filePath);
-    res.set('Content-Type', 'audio/mpeg');
-    res.set('Content-Disposition', `inline; filename="segment-${index}.mp3"`);
-    res.send(audioBuffer);
+    const fileStat = await stat(filePath).catch(() => null);
+    if (!fileStat || fileStat.size === 0) {
+      res.status(404).json({ error: 'Segment audio file not found or empty' });
+      return;
+    }
+
+    streamFile(res, filePath, `segment-${index}.mp3`, 'audio/mpeg');
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -308,7 +350,7 @@ app.get('/api/subtitles/segments/:id/audio', async (req, res) => {
 
 app.post('/api/subtitles/export', async (req, res) => {
   try {
-    const { jobId, savePath } = req.body;
+    const { jobId, savePath, filename } = req.body;
     if (!jobId) {
       res.status(400).json({ error: 'jobId is required' });
       return;
@@ -326,17 +368,41 @@ app.post('/api/subtitles/export', async (req, res) => {
       return;
     }
 
+    const exportFilename = filename ? sanitizeFilename(filename) : `subtitles-${jobId.slice(0, 8)}.mp3`;
+
+    if (savePath) {
+      const normalized = resolve(savePath);
+      if (!normalized.toLowerCase().endsWith('.mp3')) {
+        res.status(400).json({ error: 'Save path must end with .mp3' });
+        return;
+      }
+      const outputDir = resolve(OUTPUT_DIR);
+      if (!normalized.startsWith(outputDir) && !normalized.startsWith(resolve('.'))) {
+        res.status(400).json({ error: 'Save path must be within the project directory' });
+        return;
+      }
+    }
+
     const jobDir = join(SUBTITLE_JOBS_DIR, jobId);
     const adjustedDir = join(jobDir, 'adjusted');
 
     try {
       const { gapMode = 'subtitle', smoothMerge = true, crossfadeMs = 20 } = req.body;
       const finalPath = await exportFinalAudio(jobDir, job.segments, adjustedDir, { gapMode, smoothMerge, crossfadeMs });
-      const resp: any = { exportId: jobId, downloadUrl: `/api/subtitles/export/${jobId}/download` };
+      const fileStat = await stat(finalPath);
+      if (fileStat.size === 0) throw new Error('Exported MP3 is empty');
+      const resp: any = { exportId: jobId, downloadUrl: `/api/subtitles/export/${jobId}/download?filename=${encodeURIComponent(exportFilename)}` };
       if (savePath) {
-        await copyFile(finalPath, savePath);
-        resp.savedTo = savePath;
+        try {
+          await mkdir(resolve(savePath, '..'), { recursive: true });
+          await copyFile(finalPath, savePath);
+          resp.savedTo = savePath;
+        } catch (cpErr: any) {
+          res.status(500).json({ error: `Failed to save to path: ${cpErr.message}` });
+          return;
+        }
       }
+      resp.filename = exportFilename;
       res.json(resp);
     } catch (err: any) {
       res.status(500).json({ error: `Export failed: ${err.message}` });
@@ -350,10 +416,26 @@ app.get('/api/subtitles/export/:id/download', async (req, res) => {
   try {
     const jobId = req.params.id;
     const finalPath = join(SUBTITLE_JOBS_DIR, jobId, 'final.mp3');
-    const audioBuffer = await readFile(finalPath);
-    res.set('Content-Type', 'audio/mpeg');
-    res.set('Content-Disposition', `attachment; filename="subtitles-${jobId.slice(0, 8)}.mp3"`);
-    res.send(audioBuffer);
+    const fileStat = await stat(finalPath);
+    if (fileStat.size === 0) {
+      res.status(500).json({ error: 'Exported MP3 is empty' });
+      return;
+    }
+    let filename = req.query.filename as string;
+    if (!filename) filename = `subtitles-${jobId.slice(0, 8)}.mp3`;
+    filename = sanitizeFilename(filename);
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', fileStat.size);
+    res.setHeader('Cache-Control', 'no-store');
+    const stream = createReadStream(finalPath);
+    stream.on('error', (err) => {
+      console.error('Download stream error:', err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream audio file' });
+      }
+    });
+    stream.pipe(res);
   } catch {
     res.status(404).json({ error: 'Export not found. Please export first.' });
   }
@@ -427,9 +509,12 @@ app.get('/api/subtitles/preview-completed/:jobId', async (req, res) => {
   try {
     const jobId = req.params.jobId;
     const previewFile = join(SUBTITLE_JOBS_DIR, jobId, 'preview-completed.mp3');
-    const audioBuffer = await readFile(previewFile);
-    res.set('Content-Type', 'audio/mpeg');
-    res.send(audioBuffer);
+    const fileStat = await stat(previewFile);
+    if (fileStat.size === 0) {
+      res.status(500).json({ error: 'Preview audio is empty' });
+      return;
+    }
+    streamFile(res, previewFile, 'preview-completed.mp3', 'audio/mpeg');
   } catch {
     res.status(404).json({ error: 'Preview not found. Generate completed segments first.' });
   }
@@ -524,6 +609,29 @@ async function processJob(id: string, text: string, voice: string, jobDir: strin
   }
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Khmer TTS Server running at http://localhost:${PORT}`);
 });
+
+/* Increase timeouts for long exports and downloads (30 minutes for long exports) */
+server.timeout = 30 * 60 * 1000;
+server.headersTimeout = 30 * 60 * 1000;
+server.requestTimeout = 30 * 60 * 1000;
+
+/* Periodic cleanup of old subtitle jobs (older than 1 hour) to prevent memory leaks */
+setInterval(() => {
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+  for (const [id, job] of subtitleJobs) {
+    if (now - new Date(job.createdAt).getTime() > oneHour) {
+      subtitleJobs.delete(id);
+      const jobDir = join(SUBTITLE_JOBS_DIR, id);
+      unlink(join(jobDir, 'final.mp3')).catch(() => {});
+    }
+  }
+  for (const [id, job] of jobs) {
+    if (now - job.createdAt.getTime() > oneHour) {
+      jobs.delete(id);
+    }
+  }
+}, 5 * 60 * 1000);

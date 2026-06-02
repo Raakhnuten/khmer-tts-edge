@@ -34,11 +34,16 @@ function simpleHash(text: string): string {
 
 function execFFmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(FFMPEG_PATH, args, { stdio: 'ignore' });
-    child.on('error', () => reject(new Error(`FFmpeg not found. Install FFmpeg and add it to your PATH.`)));
+    const child = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+    child.on('error', () => reject(new Error('FFmpeg not found. Install FFmpeg and add it to your PATH.')));
     child.on('exit', (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`FFmpeg exited with code ${code}`));
+      else {
+        const detail = stderr.split('\n').slice(-2).join(' ').trim().slice(0, 200);
+        reject(new Error(`FFmpeg exited with code ${code}: ${detail}`));
+      }
     });
   });
 }

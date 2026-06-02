@@ -31,7 +31,6 @@
   --font: -apple-system, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'SF Mono', 'Consolas', monospace;
   --font-khmer: 'Leelawadee UI','Khmer OS','Noto Sans Khmer',sans-serif;
-  --timeline-h: 210px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: none; -ms-overflow-style: none; }
@@ -55,7 +54,7 @@ body {
   width: 100vw;
   height: 100vh;
   display: grid;
-  grid-template-rows: auto 1fr auto var(--timeline-h);
+  grid-template-rows: auto 1fr auto;
   background: var(--card);
 }
 
@@ -350,103 +349,6 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
 .empty-box .empty-icon { font-size: 40px; margin-bottom: 14px; opacity: 0.6; }
 .empty-box strong { display: block; font-size: 16px; color: var(--text-secondary); margin-bottom: 4px; }
 .empty-box p { font-size: 13px; color: var(--text-muted); }
-
-/* ── TIMELINE PANEL (grid row 3) ── */
-.timeline-panel {
-  overflow: hidden;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-}
-
-#timelineSection {
-  display: none;
-  flex: 1;
-  min-height: 0;
-  flex-direction: column;
-}
-
-#timelineSection.visible {
-  display: flex;
-}
-
-.timeline-toolbar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 20px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.timeline-toolbar h2 {
-  font-size: 12px; font-weight: 700; color: var(--text-secondary);
-  text-transform: uppercase; letter-spacing: 0.5px;
-}
-
-.timeline-scroll-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 4px 20px;
-}
-
-.timeline-box {
-  position: relative;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: #fff;
-  min-width: 100%;
-}
-
-.timeline-inner { position: relative; min-height: 84px; }
-.timeline-tracks { padding-left: 56px; position: relative; }
-.timeline-ruler {
-  position: relative; height: 24px;
-  border-bottom: 1px solid var(--border-light); background: #fafafa;
-}
-.ruler-tick {
-  position: absolute; top: 0; width: 1px; height: 8px; background: var(--border);
-}
-.ruler-label {
-  position: absolute; top: 10px; font-size: 9px; color: var(--text-muted);
-  transform: translateX(-50%); white-space: nowrap; font-family: var(--font-mono);
-}
-.timeline-row {
-  position: relative; height: 28px; border-bottom: 1px solid var(--border-light);
-}
-.timeline-row:last-child { border-bottom: none; }
-.timeline-label {
-  position: absolute; left: -50px; top: 6px; font-size: 9px; color: var(--text-muted);
-  width: 46px; text-align: right; padding-right: 6px;
-  font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
-}
-.tl-block {
-  position: absolute; top: 2px; height: 24px; border-radius: 4px;
-  font-size: 10px; display: flex; align-items: center; justify-content: center;
-  overflow: hidden; cursor: pointer; transition: box-shadow 0.15s, background 0.15s;
-  border: 1.5px solid transparent; padding: 0 4px; user-select: none;
-}
-.tl-block:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); z-index: 2; }
-.tl-block.selected { border-color: var(--primary-dark); border-width: 2px; box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
-.tl-sub { background: #bbf7d0; color: #166534; }
-.tl-aud { background: #c4b5fd; color: var(--primary-dark); }
-.tl-aud.playing { background: var(--danger); color: #fff; }
-.tl-aud.can-play:hover { background: var(--primary); color: #fff; }
-.tl-empty { background: var(--border-light); color: var(--text-muted); border: 1px dashed var(--border); }
-.playhead-line {
-  position: absolute; top: 0; width: 2px; height: 100%;
-  background: var(--danger); z-index: 10; pointer-events: none;
-  transition: left 0.15s ease;
-}
-.playhead-line::before {
-  content: ''; position: absolute; top: 0; left: -5px;
-  width: 0; height: 0;
-  border-left: 5px solid transparent; border-right: 5px solid transparent;
-  border-top: 7px solid var(--danger);
-}
 
 /* ── STATUS BAR ── */
 .status-bar {
@@ -767,12 +669,9 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
   .export-path-input { min-width: 60px; }
 }
 @media (max-height: 700px) {
-  :root { --timeline-h: 170px; }
   .import-bar textarea { height: 32px; }
-  .timeline-inner { min-height: 72px; }
 }
 @media (max-height: 600px) {
-  :root { --timeline-h: 150px; }
   .header-title p { display: none; }
   .header-top { padding: 4px 12px; }
   .import-bar { padding: 2px 12px 6px; }
@@ -893,58 +792,22 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
   </div>
   </div>
 
-  <!-- ══════════ TIMELINE PANEL (grid row 4) ══════════ -->
-  <div class="timeline-panel">
-    <div id="timelineSection">
-      <div class="timeline-toolbar">
-        <h2>Timeline</h2>
-        <button class="btn btn-sm btn-outline" id="playTimelineBtn" onclick="togglePlayTimeline()">&#9654; Play All</button>
-      </div>
-      <div class="timeline-scroll-wrap">
-        <div class="timeline-box" id="timelineWrap">
-          <div class="timeline-inner" id="timelineContent">
-            <div class="timeline-tracks">
-              <div class="timeline-ruler" id="ruler"></div>
-              <div class="timeline-row" id="subtitleTrack">
-                <span class="timeline-label">Sub</span>
-              </div>
-              <div class="timeline-row" id="audioTrack">
-                <span class="timeline-label">Aud</span>
-              </div>
-            </div>
-            <div class="playhead-line" id="playhead" style="display:none"></div>
-          </div>
-        </div>
-      </div>
-      <div class="status-bar" id="statusBar">
-        <span class="s-item">Segments: <span class="s-val" id="sbSegments">0</span></span>
-        <span class="s-item"><span class="dot dot-completed"></span> Done: <span class="s-val" id="sbCompleted">0</span></span>
-        <span class="s-item"><span class="dot dot-pending"></span> Pending: <span class="s-val" id="sbPending">0</span></span>
-        <span class="s-item"><span class="dot dot-failed"></span> Failed: <span class="s-val" id="sbFailed">0</span></span>
-        <span class="right" id="jobIdDisplay"></span>
-        <span class="right"><span class="kbd">Space</span> Play / Stop</span>
-      </div>
-    </div>
-  </div>
-
 </div>
 
 <script>
 const KHMER_CHARS = /[\u1780-\u17FF\u19E0-\u19FF]/;
 const VOICE_MALE = 'km-KH-PisethNeural';
 const VOICE_FEMALE = 'km-KH-SreymomNeural';
-const TIMELINE_SCALE = 0.08;
-
 let state = {
   jobId: null,
   segments: [],
   selectedIndices: new Set(),
-  playheadTime: 0,
+  generatingIndices: null,
   pollTimer: null,
   playingIndex: -1,
   isGenerating: false,
-  isPlayingAll: false,
-  playQueue: [],
+  isExporting: false,
+  isImporting: false,
   selectNOffset: 0,
   exportUrl: null,
 };
@@ -993,30 +856,41 @@ async function handleResponse(res) {
   const text = await res.text();
   if (!res.ok) {
     let msg;
-    try { const j = JSON.parse(text); msg = j.error || j.message || text; }
-    catch { msg = text.slice(0, 200); }
+    try {
+      const j = JSON.parse(text);
+      msg = j.error || j.message || text.slice(0, 200);
+    } catch {
+      msg = 'HTTP ' + res.status + ': ' + (text.slice(0, 200) || res.statusText || 'Unknown error');
+    }
     throw new Error(msg);
   }
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid JSON response from server');
+  }
 }
 
 async function importSRT() {
+  if (state.isImporting) return;
   const srt = document.getElementById('srtText').value.trim();
   if (!srt) { showToast('error', 'No content', 'Paste SRT content or choose a file.'); return; }
   hideToast();
+  state.isImporting = true;
   const btn = document.getElementById('importBtn');
-  btn.disabled = true; btn.textContent = 'Parsing...';
+  btn.disabled = true; btn.textContent = 'Importing...';
   try {
     const data = await handleResponse(await fetch('/api/subtitles/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ srt }),
     }));
-    if (!data.segments || data.segments.length === 0) throw new Error('No segments found in the SRT content');
+    if (!data.segments || data.segments.length === 0) throw new Error('No valid segments found in SRT content. Check timing format.');
     await createJob(data.segments);
   } catch (err) {
     showToast('error', 'Import failed', err.message);
   }
+  state.isImporting = false;
   btn.disabled = false; btn.textContent = 'Import';
 }
 
@@ -1027,19 +901,20 @@ function clearSRT() {
   document.getElementById('clearBtn').style.display = 'none';
   document.getElementById('playExportBtn').style.display = 'none';
   document.getElementById('exportRow').style.display = 'none';
+  document.getElementById('savePath').value = '';
   if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
-  if (state.isPlayingAll) stopPlayback();
   state.jobId = null;
   state.segments = [];
   state.selectedIndices = new Set();
   state.selectNOffset = 0;
-  state.playheadTime = 0;
   state.exportUrl = null;
   state.isGenerating = false;
+  state.isExporting = false;
+  state.isImporting = false;
+  state.generatingIndices = null;
   state.playingIndex = -1;
   resetPlayer();
   renderTable();
-  renderTimeline();
   showToast('info', 'Cleared', 'Subtitle data has been cleared.');
   setTimeout(hideToast, 2000);
 }
@@ -1057,7 +932,6 @@ async function createJob(segments) {
   state.jobId = data.id;
   state.selectedIndices = new Set();
   state.selectNOffset = 0;
-  state.playheadTime = 0;
   state.exportUrl = null;
   document.getElementById('playExportBtn').style.display = 'none';
   document.getElementById('clearBtn').style.display = '';
@@ -1072,12 +946,8 @@ async function loadJob() {
   if (!state.jobId) return;
   const job = await handleResponse(await fetch('/api/subtitles/jobs/' + state.jobId));
   state.segments = job.segments || [];
-  const prev = new Set();
-  for (const idx of state.selectedIndices) if (idx < state.segments.length) prev.add(idx);
-  if (prev.size === 0) for (const s of state.segments) prev.add(s.index);
-  state.selectedIndices = prev;
+  state.selectedIndices = new Set();
   renderTable();
-  renderTimeline();
   updateStats();
   hideProgress();
 }
@@ -1087,12 +957,8 @@ function renderTable() {
   const segs = state.segments;
   if (!segs || segs.length === 0) {
     area.innerHTML = '<div class="empty-box"><div class="empty-icon">\uD83D\uDCC4</div><strong>No subtitle data yet</strong><p>Import an .srt file or paste subtitle content to begin.</p></div>';
-    document.getElementById('timelineSection').classList.remove('visible');
-    document.getElementById('statusBar').style.display = 'none';
     return;
   }
-  document.getElementById('timelineSection').classList.add('visible');
-  document.getElementById('statusBar').style.display = 'flex';
 
   let html = '<div class="table-card"><div class="table-scroll"><table><thead><tr>' +
     '<th class="col-check"><input type="checkbox" onchange="toggleAllCheckboxes(this.checked)" ' + (state.selectedIndices.size === segs.length ? 'checked' : '') + '></th>' +
@@ -1109,6 +975,8 @@ function renderTable() {
     const checked = state.selectedIndices.has(seg.index) ? 'checked' : '';
     const selected = state.selectedIndices.has(seg.index) ? ' selected' : '';
     const activeRow = state.playingIndex === seg.index ? ' active-row' : '';
+    const inclCompleted = document.getElementById('inclCompleted').checked;
+    const cbDisabled = state.isGenerating || (seg.status === 'completed' && !inclCompleted);
 
     let badge = '';
     if (seg.status === 'pending') badge = '<span class="badge badge-pending">Pending</span>';
@@ -1124,7 +992,7 @@ function renderTable() {
     const textValid = KHMER_CHARS.test(seg.text) ? '' : ' invalid';
 
     html += '<tr class="' + selected + activeRow + '" data-index="' + seg.index + '" onclick="selectRow(' + seg.index + ')">' +
-      '<td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" ' + checked + ' onchange="toggleCheckbox(' + seg.index + ', this.checked)"></td>' +
+      '<td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" ' + checked + (cbDisabled ? ' disabled' : '') + ' onchange="toggleCheckbox(' + seg.index + ', this.checked)"></td>' +
       '<td class="col-idx">' + (seg.index + 1) + '</td>' +
       '<td class="col-time"><span class="time-display">' + formatTime(seg.startTime) + '</span></td>' +
       '<td class="col-time"><span class="time-display">' + formatTime(seg.endTime) + '</span></td>' +
@@ -1141,94 +1009,23 @@ function renderTable() {
   area.innerHTML = html;
 }
 
-function renderTimeline() {
-  const segs = state.segments;
-  if (!segs || segs.length === 0) return;
-  const maxEnd = Math.max(...segs.map(s => s.endTime), 10000);
-  const totalWidth = maxEnd * TIMELINE_SCALE + 100;
-
-  const ruler = document.getElementById('ruler');
-  ruler.innerHTML = '';
-  const interval = 5000;
-  for (let t = 0; t <= maxEnd; t += interval) {
-    const x = t * TIMELINE_SCALE;
-    const m = document.createElement('div'); m.className = 'ruler-tick'; m.style.left = x + 'px'; ruler.appendChild(m);
-    const l = document.createElement('div'); l.className = 'ruler-label'; l.style.left = x + 'px'; l.textContent = formatTime(t); ruler.appendChild(l);
-  }
-  ruler.style.width = totalWidth + 'px';
-
-  const subTrack = document.getElementById('subtitleTrack');
-  subTrack.innerHTML = '<span class="timeline-label">Sub</span>';
-  subTrack.style.width = totalWidth + 'px'; subTrack.style.position = 'relative';
-
-  const audTrack = document.getElementById('audioTrack');
-  audTrack.innerHTML = '<span class="timeline-label">Aud</span>';
-  audTrack.style.width = totalWidth + 'px'; audTrack.style.position = 'relative';
-
-  let selIdx = -1;
-  if (state.selectedIndices.size === 1) selIdx = [...state.selectedIndices][0];
-
-  for (const seg of segs) {
-    const left = seg.startTime * TIMELINE_SCALE;
-    const width = Math.max((seg.endTime - seg.startTime) * TIMELINE_SCALE, 4);
-    const isSel = seg.index === selIdx;
-
-    const sb = document.createElement('div');
-    sb.className = 'tl-block tl-sub' + (isSel ? ' selected' : '');
-    sb.style.left = left + 'px'; sb.style.width = width + 'px';
-    sb.textContent = seg.text.slice(0, Math.floor(width / 7)) + (seg.text.length > Math.floor(width / 7) ? '\u2026' : '');
-    sb.title = '#' + (seg.index + 1) + ': ' + seg.text;
-    sb.onclick = () => { selectRow(seg.index); movePlayhead(seg.startTime); };
-    subTrack.appendChild(sb);
-
-    const ab = document.createElement('div');
-    if (seg.status === 'completed') {
-      const isPlaying = state.playingIndex === seg.index;
-      ab.className = 'tl-block tl-aud' + (isSel ? ' selected' : '') + (isPlaying ? ' playing' : ' can-play');
-      ab.style.left = left + 'px'; ab.style.width = width + 'px';
-      const playIcon = isPlaying ? '\u23F8' : '\u25B6';
-      const speedText = seg.speedRatio && seg.speedRatio !== 1.0 ? ' ' + seg.speedRatio.toFixed(1) + 'x' : '';
-      ab.innerHTML = '<span style="font-size:11px;margin-right:2px">' + playIcon + '</span>' + speedText;
-      ab.title = 'Click to ' + (isPlaying ? 'stop' : 'play') + ' segment ' + (seg.index + 1);
-      ab.onclick = (e) => { e.stopPropagation(); selectRow(seg.index); movePlayhead(seg.startTime); playSegment(seg.index); };
-    } else {
-      ab.className = 'tl-block tl-empty';
-      ab.style.left = left + 'px'; ab.style.width = width + 'px';
-      ab.textContent = '\u2014';
-      ab.onclick = () => { selectRow(seg.index); movePlayhead(seg.startTime); };
-    }
-    audTrack.appendChild(ab);
-  }
-  updatePlayhead();
-}
-
-function updatePlayhead() {
-  const ph = document.getElementById('playhead');
-  if (state.playheadTime >= 0) { ph.style.display = 'block'; ph.style.left = (state.playheadTime * TIMELINE_SCALE) + 'px'; }
-  else ph.style.display = 'none';
-}
-
-function movePlayhead(time) { state.playheadTime = Math.max(0, time); updatePlayhead(); }
-
 function selectRow(index) {
   state.selectedIndices.clear();
   state.selectedIndices.add(index);
-  movePlayhead(state.segments[index].startTime);
   renderTable();
-  renderTimeline();
   updateStats();
 }
 
 function toggleCheckbox(index, checked) {
   if (checked) state.selectedIndices.add(index);
   else state.selectedIndices.delete(index);
+  renderTable();
   updateStats();
 }
 function toggleAllCheckboxes(checked) {
   if (checked) for (const s of state.segments) state.selectedIndices.add(s.index);
   else state.selectedIndices.clear();
   updateStats();
-  renderTimeline();
 }
 function updateText(index, value) {
   const seg = state.segments[index];
@@ -1236,7 +1033,6 @@ function updateText(index, value) {
   seg.text = value;
   const inp = document.querySelector('.text-input[data-index="' + index + '"]');
   if (inp) { if (KHMER_CHARS.test(value)) inp.classList.remove('invalid'); else inp.classList.add('invalid'); }
-  renderTimeline();
 }
 function updateVoice(index, value) {
   const seg = state.segments[index];
@@ -1253,7 +1049,6 @@ function selectPending() {
     if (s.status === 'pending') state.selectedIndices.add(s.index);
   }
   renderTable();
-  renderTimeline();
   updateStats();
 }
 
@@ -1263,7 +1058,6 @@ function selectFailed() {
     if (s.status === 'failed') state.selectedIndices.add(s.index);
   }
   renderTable();
-  renderTimeline();
   updateStats();
 }
 
@@ -1273,7 +1067,6 @@ function selectAllToGenerate() {
     if (s.status !== 'completed') state.selectedIndices.add(s.index);
   }
   renderTable();
-  renderTimeline();
   updateStats();
 }
 
@@ -1286,7 +1079,6 @@ function selectNToGenerate() {
     state.selectNOffset = 0;
     state.selectedIndices = new Set();
     renderTable();
-    renderTimeline();
     updateStats();
     return;
   }
@@ -1300,30 +1092,43 @@ function selectNToGenerate() {
   state.selectedIndices = new Set(chosen.map(c => c.index));
   state.selectNOffset = (offset + n) % pendings.length;
   renderTable();
-  renderTimeline();
   updateStats();
 }
 
 function updateGenerateBtn() {
-  const btn = document.getElementById('generateBtn');
-  if (state.isGenerating || btn.disabled) return;
-  const inclCompleted = document.getElementById('inclCompleted').checked;
-  const count = [...state.selectedIndices].filter(i => {
-    const seg = state.segments[i];
-    if (!seg) return false;
-    if (seg.status === 'completed' && !inclCompleted) return false;
-    return true;
-  }).length;
-  btn.innerHTML = count > 0 ? `\u25B6 Generate (${count})` : '\u25B6 Generate';
+  var genBtn = document.getElementById('generateBtn');
+  var expBtn = document.getElementById('exportBtn');
+  if (state.isGenerating || state.isExporting) {
+    genBtn.disabled = true;
+    expBtn.disabled = true;
+    return;
+  }
+  var inclCompleted = document.getElementById('inclCompleted').checked;
+  var count = 0;
+  var selectedArr = [...state.selectedIndices];
+  for (var i = 0; i < selectedArr.length; i++) {
+    var seg = state.segments[selectedArr[i]];
+    if (!seg) continue;
+    if (seg.status === 'completed' && !inclCompleted) continue;
+    count++;
+  }
+  genBtn.disabled = count === 0;
+  genBtn.innerHTML = count > 0 ? '\u25B6 Generate (' + count + ')' : '\u25B6 Generate';
+  expBtn.disabled = state.isExporting || state.isGenerating;
 }
 
 function updateStats() {
-  const segs = state.segments;
-  const total = segs.length;
-  const completed = segs.filter(s => s.status === 'completed').length;
-  const failed = segs.filter(s => s.status === 'failed').length;
-  const pending = total - completed - failed;
-  const selCount = state.selectedIndices.size;
+  var segs = state.segments;
+  var total = segs.length;
+  var completed = 0;
+  var failed = 0;
+  for (var i = 0; i < segs.length; i++) {
+    var s = segs[i];
+    if (s.status === 'completed') completed++;
+    else if (s.status === 'failed') failed++;
+  }
+  var pending = total - completed - failed;
+  var selCount = state.selectedIndices.size;
 
   document.getElementById('segCountBadge').textContent = total;
   document.getElementById('statsCompleted').textContent = completed;
@@ -1331,14 +1136,9 @@ function updateStats() {
   document.getElementById('statsFailed').textContent = failed;
   document.getElementById('statsSelected').textContent = selCount;
   document.getElementById('selectedCount').style.display = selCount > 0 ? '' : 'none';
-  document.getElementById('sbSegments').textContent = total;
-  document.getElementById('sbCompleted').textContent = completed;
-  document.getElementById('sbPending').textContent = pending;
-  document.getElementById('sbFailed').textContent = failed;
 
-  const jid = document.getElementById('jobIdDisplay');
-  if (state.jobId) jid.textContent = 'Job: ' + state.jobId.slice(0, 8) + '\u2026';
-  else jid.textContent = '';
+  var expBtn = document.getElementById('exportBtn');
+  if (expBtn) expBtn.disabled = state.isExporting || state.isGenerating || completed === 0;
 
   updateGenerateBtn();
 }
@@ -1359,9 +1159,11 @@ async function generateSelected() {
 
   hideToast();
   state.isGenerating = true;
-  const btn = document.getElementById('generateBtn');
-  btn.disabled = true;
-  btn.textContent = 'Generating (' + indices.length + ')...';
+  const genBtn = document.getElementById('generateBtn');
+  const expBtn = document.getElementById('exportBtn');
+  genBtn.disabled = true;
+  genBtn.textContent = 'Generating (' + indices.length + ')...';
+  expBtn.disabled = true;
   setPlayerGenerating();
   showProgress(0, 'Starting generation for ' + indices.length + ' segment(s)...');
 
@@ -1372,206 +1174,193 @@ async function generateSelected() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ indices, segments: updatedSegments }),
     }));
-    startPolling(indices.length);
+    state.generatingIndices = new Set(indices);
+    startPolling();
   } catch (err) {
-    showToast('error', 'Generation failed', err.message);
+    showToast('error', 'Generation failed', err.message || 'Unknown error');
     state.isGenerating = false;
-    btn.disabled = false;
+    genBtn.disabled = false;
+    expBtn.disabled = false;
     updateStats();
     hideProgress();
     clearPlayerGenerating();
   }
 }
 
-function startPolling(totalCount) {
+function startPolling() {
   if (state.pollTimer) clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(() => pollJob(totalCount), 1000);
-  pollJob(totalCount);
+  state.pollTimer = setInterval(pollJob, 2000);
+  pollJob();
 }
 
-async function pollJob(totalCount) {
+async function pollJob() {
   if (!state.jobId) return;
   try {
     const res = await fetch('/api/subtitles/jobs/' + state.jobId);
-    if (!res.ok) { clearInterval(state.pollTimer); state.isGenerating = false; clearPlayerGenerating(); return; }
+    if (!res.ok) {
+      stopPolling();
+      return;
+    }
     const job = await res.json();
     state.segments = job.segments || [];
     renderTable();
-    renderTimeline();
     updateStats();
 
-    const completed = job.segments.filter(s => s.status === 'completed').length;
-    const failed = job.segments.filter(s => s.status === 'failed').length;
-    const done = completed + failed;
-    const total = totalCount || job.segments.length;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    showProgress(pct, 'Processing segment ' + done + ' of ' + total + '...');
+    var genIndices = state.generatingIndices;
+    if (!genIndices) return;
+    var genSegments = job.segments.filter(function(s) { return genIndices.has(s.index); });
+    var genCompleted = genSegments.filter(function(s) { return s.status === 'completed'; }).length;
+    var genFailed = genSegments.filter(function(s) { return s.status === 'failed'; }).length;
+    var genDone = genCompleted + genFailed;
+    var genTotal = genIndices.size;
+    var pct = genTotal > 0 ? Math.round((genDone / genTotal) * 100) : 0;
+    showProgress(pct, 'Processing segment ' + genDone + ' of ' + genTotal + '...');
 
-    const allDone = job.segments.every(s => s.status === 'completed' || s.status === 'failed');
-    if (allDone) {
-      clearInterval(state.pollTimer);
-      state.pollTimer = null;
+    var allGenDone = genSegments.length > 0 && genSegments.every(function(s) { return s.status === 'completed' || s.status === 'failed'; });
+    if (allGenDone) {
+      stopPolling();
       state.isGenerating = false;
+      state.generatingIndices = null;
       hideProgress();
 
-      for (const seg of job.segments) {
+      state.selectedIndices.clear();
+      for (var i = 0; i < job.segments.length; i++) {
+        var seg = job.segments[i];
         if (seg.status !== 'completed') state.selectedIndices.add(seg.index);
       }
-      const btn = document.getElementById('generateBtn');
-      btn.disabled = false;
-      renderTimeline();
+      var genBtn = document.getElementById('generateBtn');
+      var expBtn = document.getElementById('exportBtn');
+      genBtn.disabled = false;
+      expBtn.disabled = false;
+      renderTable();
       updateStats();
 
-      if (failed > 0) {
-        showToast('error', 'Generation completed with errors', failed + ' segment(s) failed out of ' + total + '.');
+      if (genFailed > 0) {
+        showToast('error', 'Generation completed with errors', genFailed + ' segment(s) failed out of ' + genTotal + '.');
+        setTimeout(hideToast, 5000);
       } else {
-        showToast('success', 'Generation complete', 'All ' + completed + ' segment(s) generated successfully.');
+        showToast('success', 'Generation complete', 'All ' + genCompleted + ' segment(s) generated successfully.');
         setTimeout(hideToast, 3000);
       }
 
       loadCompletedPreview(false);
     }
   } catch {
+    stopPolling();
+  }
+}
+
+function stopPolling() {
+  if (state.pollTimer) {
     clearInterval(state.pollTimer);
-    state.isGenerating = false;
-    hideProgress();
-    const btn = document.getElementById('generateBtn');
-    btn.disabled = false;
-    updateStats();
-    clearPlayerGenerating();
+    state.pollTimer = null;
   }
-}
-
-function togglePlayTimeline() {
-  if (state.isPlayingAll) { stopPlayback(); return; }
-  const completed = state.segments.filter(s => s.status === 'completed');
-  if (completed.length === 0) { showToast('error', 'Nothing to play', 'No completed audio to play.'); return; }
-  hideToast();
-  state.isPlayingAll = true;
-  state.playingIndex = -1;
-  updatePlayAllBtn();
-  renderTable();
-  renderTimeline();
-  loadCompletedPreview(true);
-}
-
-function stopPlayback() {
-  stopAudio();
-  state.isPlayingAll = false;
-  state.playQueue = [];
-  state.playQueueIndex = 0;
-  state.playingIndex = -1;
-  updatePlayAllBtn();
-  renderTable();
-  renderTimeline();
-}
-
-function updatePlayAllBtn() {
-  const btn = document.getElementById('playTimelineBtn');
-  if (btn) {
-    btn.innerHTML = state.isPlayingAll ? '\u23F8 Stop' : '\u25B6 Play All';
-    btn.className = 'btn btn-sm ' + (state.isPlayingAll ? 'btn-danger' : 'btn-outline');
-  }
+  state.isGenerating = false;
+  state.generatingIndices = null;
+  hideProgress();
+  var genBtn = document.getElementById('generateBtn');
+  var expBtn = document.getElementById('exportBtn');
+  if (genBtn) genBtn.disabled = false;
+  if (expBtn) expBtn.disabled = false;
+  updateStats();
+  clearPlayerGenerating();
 }
 
 function playSegment(index) {
-  if (state.isPlayingAll) stopPlayback();
   const seg = state.segments[index];
   if (!seg || seg.status !== 'completed') return;
   if (state.playingIndex === index && isPlaying()) { pauseAudio(); return; }
   state.playingIndex = index;
   renderTable();
-  renderTimeline();
-  fetch('/api/subtitles/segments/' + state.jobId + '/audio?index=' + index)
-    .then(async res => {
-      if (!res.ok) { const t = await res.text().catch(() => 'Unknown'); throw new Error(t.slice(0, 200)); }
-      return res.blob();
-    })
-    .then(blob => {
-      const url = URL.createObjectURL(blob);
-      loadAudio(url, 'segment', index);
-      playAudio();
-    })
-    .catch(err => { showToast('error', 'Playback failed', err.message); state.playingIndex = -1; renderTable(); renderTimeline(); });
+  var url = '/api/subtitles/segments/' + state.jobId + '/audio?index=' + index + '&t=' + Date.now();
+  fetch(url).then(function(res) {
+    if (!res.ok) {
+      return res.text().then(function(t) { throw new Error('HTTP ' + res.status + ': ' + (t.slice(0, 200) || 'Unknown')); });
+    }
+    return res.blob();
+  }).then(function(blob) {
+    var objUrl = URL.createObjectURL(blob);
+    loadAudio(objUrl, 'segment', index);
+    playAudio();
+  }).catch(function(err) {
+    showToast('error', 'Playback failed', err.message || 'Could not load audio');
+    state.playingIndex = -1;
+    renderTable();
+  });
 }
 
-let _saveFileHandle = null;
-
-async function browseSavePath() {
-  try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: 'subtitles-' + (state.jobId ? state.jobId.slice(0, 8) : 'final') + '.mp3',
-      types: [{ description: 'MP3 Audio', accept: { 'audio/mpeg': ['.mp3'] } }],
-    });
-    _saveFileHandle = handle;
-    document.getElementById('savePath').value = handle.name;
-    showToast('info', 'File selected', 'Save location: ' + handle.name);
-    setTimeout(hideToast, 2000);
-  } catch {
-    // User cancelled or API unavailable
+function browseSavePath() {
+  var input = document.getElementById('savePath');
+  var suggested = 'subtitles-' + (state.jobId ? state.jobId.slice(0, 8) : 'final') + '.mp3';
+  var name = prompt('Enter filename:', suggested);
+  if (name && name.trim()) {
+    input.value = sanitizeFilename(name.trim());
   }
 }
 
-async function exportFinal() {
-  if (!state.jobId) { showToast('error', 'No job', 'No job to export. Import subtitles first.'); return; }
-  hideToast();
-  const done = state.segments.filter(s => s.status === 'completed').length;
-  if (done === 0) { showToast('error', 'Nothing to export', 'No completed segments to export. Generate audio first.'); return; }
+function sanitizeFilename(name) {
+  if (!name || !name.trim()) return 'subtitles.mp3';
+  var safe = name.trim();
+  if (!safe.toLowerCase().endsWith('.mp3')) safe += '.mp3';
+  safe = safe.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  if (safe.length > 255) safe = safe.slice(0, 255);
+  return safe;
+}
 
+/* Trigger a browser download via a temporary <a> element (no blob, no fetch — works for any file size) */
+function startDownload(url, filename) {
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'subtitles.mp3';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function exportFinal() {
+  if (state.isExporting) return;
+  if (!state.jobId) { showToast('error', 'No job', 'Import subtitles before exporting.'); return; }
+  hideToast();
+  const done = state.segments.filter(function(s) { return s.status === 'completed'; }).length;
+  if (done === 0) { showToast('error', 'Nothing to export', 'Generate audio for at least one segment first.'); return; }
+
+  state.isExporting = true;
   const btn = document.getElementById('exportBtn');
   btn.disabled = true;
   btn.textContent = '\u23F3 Exporting...';
+
   try {
-    const data = await handleResponse(await fetch('/api/subtitles/export', {
+    var customPath = document.getElementById('savePath').value.trim();
+    var saveFilename = customPath ? sanitizeFilename(customPath) : 'subtitles-' + state.jobId.slice(0, 8) + '.mp3';
+
+    const exportResp = await fetch('/api/subtitles/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId: state.jobId }),
-    }));
+      body: JSON.stringify({ jobId: state.jobId, filename: saveFilename }),
+    });
+    const exportData = await handleResponse(exportResp);
+    const downloadUrl = exportData.downloadUrl;
 
-    const audioResp = await fetch(data.downloadUrl);
-    const audioBlob = await audioResp.blob();
+    if (!downloadUrl) throw new Error('Server did not return a download URL');
 
-    if (_saveFileHandle) {
-      const writable = await _saveFileHandle.createWritable();
-      await writable.write(audioBlob);
-      await writable.close();
-      _saveFileHandle = null;
-      showToast('success', 'Exported', 'File saved successfully.');
-      setTimeout(hideToast, 3000);
-    } else {
-      const customPath = document.getElementById('savePath').value.trim();
-      if (customPath) {
-        await fetch('/api/subtitles/export', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId: state.jobId, savePath: customPath }),
-        });
-        showToast('success', 'Exported', 'Saved to: ' + customPath);
-        setTimeout(hideToast, 4000);
-      } else {
-        const a = document.createElement('a');
-        a.href = data.downloadUrl;
-        a.download = 'subtitles-' + state.jobId.slice(0, 8) + '.mp3';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        showToast('success', 'Exported', 'Final MP3 downloaded successfully.');
-        setTimeout(hideToast, 3000);
-      }
-    }
+    state.exportUrl = downloadUrl;
 
-    state.exportUrl = data.downloadUrl;
+    startDownload(downloadUrl, saveFilename);
+    showToast('success', 'Export started', saveFilename + ' is downloading...');
+    setTimeout(hideToast, 5000);
+
     document.getElementById('playExportBtn').style.display = '';
-    loadAudio(data.downloadUrl, 'export');
-    playAudio();
-  } catch (err) { showToast('error', 'Export failed', err.message); }
+    loadAudio(downloadUrl, 'export');
+  } catch (err) {
+    showToast('error', 'Export failed', err.message || 'Unknown error');
+  }
+  state.isExporting = false;
   btn.disabled = false;
   btn.textContent = '\uD83D\uDCBE Export';
 }
 
 function playExportAudio() {
   if (state.exportUrl) {
-    if (state.isPlayingAll) stopPlayback();
     state.playingIndex = -1;
     loadAudio(state.exportUrl, 'export');
     playAudio();
@@ -1591,6 +1380,8 @@ function clearPlayerGenerating() {
 
 async function loadCompletedPreview(autoPlay) {
   if (!state.jobId) return;
+  var completedCount = state.segments.filter(function(s) { return s.status === 'completed'; }).length;
+  if (completedCount === 0) return;
   try {
     const data = await handleResponse(await fetch('/api/subtitles/preview-completed', {
       method: 'POST',
@@ -1600,18 +1391,8 @@ async function loadCompletedPreview(autoPlay) {
     loadAudio(data.url, 'preview', null, data.segmentCount);
     if (autoPlay) playAudio();
   } catch (err) {
-    if (autoPlay) showToast('error', 'Preview unavailable', err.message);
+    /* Preview not available - this is expected if no segments completed yet */
   }
-}
-
-/* Reusable API for the audio player */
-function createAudioPlayer(container, audioUrl) {
-  if (container) {
-    var existing = container.querySelector('.sleek-player');
-    if (!existing) container.innerHTML = document.getElementById('sleekPlayer').outerHTML;
-  }
-  if (audioUrl) loadAudio(audioUrl);
-  return { loadAudio: loadAudio, playAudio: playAudio, pauseAudio: pauseAudio, stopAudio: stopAudio, formatTime: formatTimeFromSeconds };
 }
 
 /* ── SLEEK AUDIO PLAYER ── */
@@ -1675,10 +1456,9 @@ function playAudio() {
 
 function pauseAudio() {
   audioEl.pause();
-  if (state.playingIndex >= 0 && !state.isPlayingAll) {
+  if (state.playingIndex >= 0) {
     state.playingIndex = -1;
     renderTable();
-    renderTimeline();
   }
 }
 
@@ -1735,13 +1515,6 @@ audioEl.addEventListener('timeupdate', function() {
   if (!isDragging) {
     spProgressFill.classList.remove('nosmooth');
     updatePlayerUI();
-    if (audioEl._sourceType === 'segment' && audioEl._segmentIndex >= 0) {
-      const seg = state.segments[audioEl._segmentIndex];
-      if (seg) {
-        const phTime = seg.startTime + audioEl.currentTime * 1000;
-        movePlayhead(phTime);
-      }
-    }
   }
 });
 
@@ -1749,14 +1522,9 @@ audioEl.addEventListener('ended', function() {
   spPlayBtn.innerHTML = '\u25B6';
   spPlayBtn.classList.remove('playing');
   spBuffer.classList.remove('active');
-  if (state.isPlayingAll) {
-    state.isPlayingAll = false;
-    updatePlayAllBtn();
-  }
   if (audioEl._sourceType !== 'export') {
     state.playingIndex = -1;
     renderTable();
-    renderTimeline();
   }
 });
 
@@ -1778,13 +1546,9 @@ spPlayBtn.addEventListener('click', togglePlayPause);
 
 /* Stop button */
 spStopBtn.addEventListener('click', function() {
-  if (state.isPlayingAll) { stopPlayback(); }
-  else {
-    stopAudio();
-    state.playingIndex = -1;
-    renderTable();
-    renderTimeline();
-  }
+  stopAudio();
+  state.playingIndex = -1;
+  renderTable();
 });
 
 /* Volume button (toggle mute) */
@@ -1863,15 +1627,8 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-document.getElementById('timelineWrap').addEventListener('click', function(e) {
-  const wrap = this.querySelector('.timeline-inner');
-  const rect = wrap.getBoundingClientRect();
-  const x = e.clientX - rect.left + this.scrollLeft - 56;
-  if (x < 0) return;
-  movePlayhead(x / TIMELINE_SCALE);
-});
-
 document.getElementById('inclCompleted').addEventListener('change', function() {
+  renderTable();
   updateGenerateBtn();
 });
 </script>
