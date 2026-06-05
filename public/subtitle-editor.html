@@ -230,6 +230,12 @@ body {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
 }
+.export-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 20px 4px;
+  line-height: 1.4;
+}
 
 /* ── TOAST ── */
 .toast {
@@ -667,6 +673,7 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
   .status-bar .right { margin-left: 0; }
   .export-row { padding: 4px 12px; flex-wrap: wrap; }
   .export-path-input { min-width: 60px; }
+  .export-hint { padding: 2px 12px 4px; }
 }
 @media (max-height: 700px) {
   .import-bar textarea { height: 32px; }
@@ -738,10 +745,12 @@ input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--primary)
     </div>
 
     <div class="export-row" id="exportRow" style="display:none">
-      <span class="export-row-label">Save to:</span>
-      <input class="export-path-input" type="text" id="savePath" placeholder="C:\Users\...\output.mp3">
-      <button class="btn btn-sm btn-outline" onclick="browseSavePath()">&#128193; Browse</button>
+      <span class="export-row-label">File name:</span>
+      <input class="export-path-input" type="text" id="savePath" placeholder="my-audio.mp3">
+      <button class="btn btn-sm btn-outline" onclick="showDownloadHelp()" title="How downloads work">&#9432; Help</button>
     </div>
+
+    <div class="export-hint" id="exportHint">Choose a filename for the downloaded MP3. Your browser controls where the file is saved.</div>
 
     <div class="progress-wrap" id="progressWrap">
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
@@ -901,6 +910,7 @@ function clearSRT() {
   document.getElementById('clearBtn').style.display = 'none';
   document.getElementById('playExportBtn').style.display = 'none';
   document.getElementById('exportRow').style.display = 'none';
+  document.getElementById('exportHint').style.display = 'none';
   document.getElementById('savePath').value = '';
   if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
   state.jobId = null;
@@ -936,6 +946,8 @@ async function createJob(segments) {
   document.getElementById('playExportBtn').style.display = 'none';
   document.getElementById('clearBtn').style.display = '';
   document.getElementById('exportRow').style.display = '';
+  document.getElementById('exportHint').style.display = '';
+  document.getElementById('savePath').value = 'subtitles-' + data.id.slice(0, 8) + '.mp3';
   resetPlayer();
   showToast('success', 'Imported', segments.length + ' subtitle segment(s) loaded.');
   setTimeout(hideToast, 3000);
@@ -1289,13 +1301,11 @@ function playSegment(index) {
   });
 }
 
-function browseSavePath() {
-  var input = document.getElementById('savePath');
-  var suggested = 'subtitles-' + (state.jobId ? state.jobId.slice(0, 8) : 'final') + '.mp3';
-  var name = prompt('Enter filename:', suggested);
-  if (name && name.trim()) {
-    input.value = sanitizeFilename(name.trim());
-  }
+function showDownloadHelp() {
+  showToast('info', 'Download filename',
+    'Enter a filename (e.g. "my-audio.mp3") in the File name field.\n\n' +
+    'Your browser controls where the file is saved.\n' +
+    'To choose a folder, enable "Ask where to save each file before downloading" in your browser settings.');
 }
 
 function sanitizeFilename(name) {

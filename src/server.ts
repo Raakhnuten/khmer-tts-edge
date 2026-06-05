@@ -1,7 +1,7 @@
 import express from 'express';
 import { createReadStream } from 'fs';
-import { mkdir, readFile, writeFile, copyFile, unlink, rmdir, stat } from 'fs/promises';
-import { join, resolve, basename } from 'path';
+import { mkdir, readFile, writeFile, unlink, rmdir, stat } from 'fs/promises';
+import { join, resolve } from 'path';
 import { randomUUID } from 'crypto';
 import { listAllVoices, isValidKhmerVoice, validateText, SHORT_TEXT_LIMIT } from './voices.js';
 import { generateAudio, ProgressInfo } from './generate.js';
@@ -11,7 +11,6 @@ import {
 } from './subtitle.js';
 
 const MAX_SRT_SIZE = 5 * 1024 * 1024; // 5MB max SRT upload
-const EXPORT_FILENAME_REGEX = /^[a-zA-Z0-9_\-.\u1780-\u17FF\u19E0-\u19FF ()]+$/;
 
 function sanitizeFilename(name: string): string {
   let safe = name.trim();
@@ -19,10 +18,6 @@ function sanitizeFilename(name: string): string {
   safe = safe.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
   if (safe.length > 255) safe = safe.slice(0, 255);
   return safe;
-}
-
-function isValidExportFilename(name: string): boolean {
-  return EXPORT_FILENAME_REGEX.test(basename(name, '.mp3').replace(/\.mp3$/, ''));
 }
 
 interface Job {
@@ -350,7 +345,7 @@ app.get('/api/subtitles/segments/:id/audio', async (req, res) => {
 
 app.post('/api/subtitles/export', async (req, res) => {
   try {
-    const { jobId, savePath, filename } = req.body;
+    const { jobId, filename } = req.body;
     if (!jobId) {
       res.status(400).json({ error: 'jobId is required' });
       return;
@@ -370,19 +365,6 @@ app.post('/api/subtitles/export', async (req, res) => {
 
     const exportFilename = filename ? sanitizeFilename(filename) : `subtitles-${jobId.slice(0, 8)}.mp3`;
 
-    if (savePath) {
-      const normalized = resolve(savePath);
-      if (!normalized.toLowerCase().endsWith('.mp3')) {
-        res.status(400).json({ error: 'Save path must end with .mp3' });
-        return;
-      }
-      const outputDir = resolve(OUTPUT_DIR);
-      if (!normalized.startsWith(outputDir) && !normalized.startsWith(resolve('.'))) {
-        res.status(400).json({ error: 'Save path must be within the project directory' });
-        return;
-      }
-    }
-
     const jobDir = join(SUBTITLE_JOBS_DIR, jobId);
     const adjustedDir = join(jobDir, 'adjusted');
 
@@ -391,19 +373,7 @@ app.post('/api/subtitles/export', async (req, res) => {
       const finalPath = await exportFinalAudio(jobDir, job.segments, adjustedDir, { gapMode, smoothMerge, crossfadeMs });
       const fileStat = await stat(finalPath);
       if (fileStat.size === 0) throw new Error('Exported MP3 is empty');
-      const resp: any = { exportId: jobId, downloadUrl: `/api/subtitles/export/${jobId}/download?filename=${encodeURIComponent(exportFilename)}` };
-      if (savePath) {
-        try {
-          await mkdir(resolve(savePath, '..'), { recursive: true });
-          await copyFile(finalPath, savePath);
-          resp.savedTo = savePath;
-        } catch (cpErr: any) {
-          res.status(500).json({ error: `Failed to save to path: ${cpErr.message}` });
-          return;
-        }
-      }
-      resp.filename = exportFilename;
-      res.json(resp);
+      res.json({ exportId: jobId, filename: exportFilename, downloadUrl: `/api/subtitles/export/${jobId}/download?filename=${encodeURIComponent(exportFilename)}` });
     } catch (err: any) {
       res.status(500).json({ error: `Export failed: ${err.message}` });
     }
