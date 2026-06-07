@@ -6,7 +6,6 @@ import { spawn } from 'child_process';
 const FFMPEG_PATH = 'ffmpeg';
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
-const RATE_LIMIT_DELAY_MS = 300;
 
 export interface SubtitleSegmentData {
   index: number;
@@ -181,8 +180,6 @@ export async function generateSegmentAudio(
   if (!ok) {
     return { status: 'failed', generatedDuration: null, speedRatio: null, error: lastError || 'Generation failed' };
   }
-
-  await sleep(RATE_LIMIT_DELAY_MS);
 
   let generatedDuration: number;
   try {

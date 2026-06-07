@@ -9,6 +9,7 @@ import {
   parseSRT, generateSegmentAudio, exportFinalAudio, saveMetadata, formatTimeShort, getAudioDuration, execFFmpeg,
   SubtitleJobData, SubtitleSegmentData,
 } from './subtitle.js';
+import { asyncPool, TTS_CONCURRENCY } from './utils/asyncPool.js';
 
 const MAX_SRT_SIZE = 5 * 1024 * 1024; // 5MB max SRT upload
 
@@ -510,29 +511,38 @@ async function processSubtitleSegments(jobId: string, indices: number[], jobDir:
   const segmentsDir = join(jobDir, 'segments');
   const adjustedDir = join(jobDir, 'adjusted');
 
-  for (const idx of indices) {
+  const pending = indices.filter(idx => {
     const seg = job.segments[idx];
-    if (!seg) continue;
+    return seg && (seg.status === 'pending' || seg.status === 'failed' || seg.status === 'generating');
+  });
 
-    seg.status = 'generating';
-    seg.error = null;
-    await saveMetadata(jobDir, job).catch(() => {});
+  if (pending.length > 0) {
+    await asyncPool(pending, TTS_CONCURRENCY, async (idx) => {
+      const seg = job.segments[idx];
+      if (!seg) return;
 
-    const targetDuration = seg.endTime - seg.startTime;
-    const result = await generateSegmentAudio(
-      seg.text,
-      seg.voice,
-      targetDuration,
-      segmentsDir,
-      adjustedDir,
-      idx,
-    );
+      seg.status = 'generating';
+      seg.error = null;
+      await saveMetadata(jobDir, job).catch(() => {});
 
-    seg.status = result.status;
-    seg.generatedDuration = result.generatedDuration;
-    seg.speedRatio = result.speedRatio;
-    seg.error = result.error;
-    await saveMetadata(jobDir, job).catch(() => {});
+      const targetDuration = seg.endTime - seg.startTime;
+
+      try {
+        const result = await generateSegmentAudio(
+          seg.text, seg.voice, targetDuration,
+          segmentsDir, adjustedDir, idx,
+        );
+        seg.status = result.status;
+        seg.generatedDuration = result.generatedDuration;
+        seg.speedRatio = result.speedRatio;
+        seg.error = result.error;
+      } catch (err: any) {
+        seg.status = 'failed';
+        seg.error = err.message;
+      }
+
+      await saveMetadata(jobDir, job).catch(() => {});
+    });
   }
 
   const allDone = job.segments.every((s) => s.status === 'completed' || s.status === 'failed');

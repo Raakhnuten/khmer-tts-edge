@@ -2,11 +2,11 @@ import { EdgeTTS, Constants } from '@andresaya/edge-tts';
 import { mkdir, readdir, unlink, rmdir, writeFile, readFile } from 'fs/promises';
 import { join } from 'path';
 import { spawn } from 'child_process';
+import { asyncPool, TTS_CONCURRENCY } from './utils/asyncPool.js';
 
 const CHUNK_MAX_LENGTH = 1000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
-const RATE_LIMIT_DELAY_MS = 300;
 const CHUNK_GAP_MS = 0;
 const CROSSFADE_MS = 20;
 const FFMPEG_PATH = 'ffmpeg';
@@ -223,53 +223,62 @@ export async function generateAudio(
   const session: SessionData = { textHash, voice: voiceName, chunks: totalChunks };
   await writeFile(sessionFile, JSON.stringify(session), 'utf-8');
 
-  const chunkFiles: string[] = [];
+  const chunkFiles: string[] = chunks.map((_, i) =>
+    join(chunksDir, `chunk-${String(i + 1).padStart(4, '0')}.mp3`)
+  );
+
   let skipped = 0;
+  const pendingIndices: number[] = [];
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkName = `chunk-${String(i + 1).padStart(4, '0')}.mp3`;
+    if (resume && existingFiles.has(chunkName)) {
+      skipped++;
+    } else {
+      pendingIndices.push(i);
+    }
+  }
+
   let startTime = Date.now();
   let hasFailure = false;
 
   onProgress?.({ currentChunk: 0, totalChunks, status: 'processing' });
 
-  for (let i = 0; i < totalChunks; i++) {
-    const chunkNum = i + 1;
-    const chunkName = `chunk-${String(chunkNum).padStart(4, '0')}.mp3`;
-    const chunkFile = join(chunksDir, chunkName);
+  if (pendingIndices.length > 0) {
+    let progressCount = skipped;
 
-    if (resume && existingFiles.has(chunkName)) {
-      chunkFiles.push(chunkFile);
-      skipped++;
-      continue;
-    }
+    const results = await asyncPool(pendingIndices, TTS_CONCURRENCY, async (chunkIndex) => {
+      const chunkNum = chunkIndex + 1;
+      const chunkFile = chunkFiles[chunkIndex];
 
-    const elapsed = (Date.now() - startTime) / 1000;
-    const done = i - skipped;
-    const avgPerChunk = done > 0 ? elapsed / done : 0;
-    const remaining = totalChunks - i;
-    const eta = avgPerChunk > 0 ? remaining * avgPerChunk : 0;
-    const etaStr = eta > 0 ? `, ETA ${Math.round(eta)}s` : '';
+      process.stdout.write(`[${chunkNum}/${totalChunks}]... `);
 
-    process.stdout.write(`[${chunkNum}/${totalChunks}]${etaStr}... `);
+      let ok = false;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        ok = await trySynthesizeChunk(chunks[chunkIndex], voiceName, chunkFile, attempt);
+        if (ok) break;
+      }
 
-    let ok = false;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      ok = await trySynthesizeChunk(chunks[i], voiceName, chunkFile, attempt);
-      if (ok) break;
-    }
+      if (!ok) {
+        console.error(`FAILED after ${MAX_RETRIES} attempts`);
+        return { ok: false, chunkNum };
+      }
 
-    if (!ok) {
-      console.error(`FAILED after ${MAX_RETRIES} attempts`);
+      console.log(`OK`);
+      progressCount++;
+
+      onProgress?.({ currentChunk: progressCount, totalChunks, status: 'processing' });
+      return { ok: true, chunkNum };
+    });
+
+    const failedResult = results.find((r) => !r.ok);
+    if (failedResult) {
       hasFailure = true;
-      onProgress?.({ currentChunk: chunkNum, totalChunks, status: 'failed', error: `Chunk ${chunkNum} failed after ${MAX_RETRIES} attempts` });
-      break;
-    }
-
-    chunkFiles.push(chunkFile);
-    console.log(`OK`);
-
-    onProgress?.({ currentChunk: chunkNum, totalChunks, status: 'processing' });
-
-    if (i < totalChunks - 1) {
-      await sleep(RATE_LIMIT_DELAY_MS);
+      onProgress?.({
+        currentChunk: failedResult.chunkNum,
+        totalChunks,
+        status: 'failed',
+        error: `Chunk ${failedResult.chunkNum} failed after ${MAX_RETRIES} attempts`,
+      });
     }
   }
 
