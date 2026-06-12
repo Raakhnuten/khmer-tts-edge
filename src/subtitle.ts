@@ -1,11 +1,12 @@
 import { EdgeTTS, Constants } from '@andresaya/edge-tts';
 import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises';
-import { join } from 'path';
-import { spawn } from 'child_process';
+import { join, dirname } from 'path';
+import { execFFmpeg, getAudioDuration } from './utils/ffmpeg.js';
+import { sleep } from './utils/helpers.js';
 
-const FFMPEG_PATH = 'ffmpeg';
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 2000;
+const DURATION_TOLERANCE_MS = 10;
 
 export interface SubtitleSegmentData {
   index: number;
@@ -32,39 +33,6 @@ export interface ExportOptions {
   crossfadeMs?: number;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-function execFFmpeg(args: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(FFMPEG_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let stderr = '';
-    child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
-    child.on('error', () => reject(new Error('FFmpeg not found. Install FFmpeg and add it to your PATH.')));
-    child.on('exit', (code) => {
-      if (code === 0) resolve();
-      else {
-        const detail = stderr.split('\n').slice(-3).join(' ').trim().slice(0, 200);
-        reject(new Error(`FFmpeg exited with code ${code}: ${detail}`));
-      }
-    });
-  });
-}
-
-function execFFprobe(args: string[]): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const child = spawn('ffprobe', args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    child.stdout.on('data', (d: Buffer) => (out += d.toString()));
-    child.on('error', () => reject(new Error('FFprobe not found. Install FFmpeg.')));
-    child.on('exit', (code) => {
-      if (code === 0) resolve(out.trim());
-      else reject(new Error(`FFprobe exited with code ${code}`));
-    });
-  });
-}
-
 export function parseSRT(srt: string): { startTime: number; endTime: number; text: string }[] {
   const normalized = srt.replace(/\r\n/g, '\n');
   const blocks = normalized.trim().split(/\n\n+/);
@@ -78,8 +46,15 @@ export function parseSRT(srt: string): { startTime: number; endTime: number; tex
     if (!timeLine) continue;
 
     const parts = timeLine.split('-->');
+    if (parts.length < 2) continue;
+
     const startTime = parseSRTTime(parts[0].trim());
     const endTime = parseSRTTime(parts[1].trim());
+
+    if (endTime <= startTime) {
+      console.warn(`Invalid subtitle timing: end ${endTime}ms <= start ${startTime}ms, skipping block`);
+      continue;
+    }
 
     const timeIdx = lines.indexOf(timeLine);
     const text = lines.slice(timeIdx + 1).join('\n').trim();
@@ -117,16 +92,6 @@ export function formatTimeShort(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = Math.floor(totalSec % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-async function getAudioDuration(filePath: string): Promise<number> {
-  const output = await execFFprobe([
-    '-v', 'error',
-    '-show_entries', 'format=duration',
-    '-of', 'default=noprint_wrappers=1:nokey=1',
-    filePath,
-  ]);
-  return Math.round(parseFloat(output) * 1000);
 }
 
 async function generateSingleSegment(
@@ -188,7 +153,12 @@ export async function generateSegmentAudio(
     return { status: 'failed', generatedDuration: null, speedRatio: null, error: `Failed to probe audio: ${err.message}` };
   }
 
-  if (targetDurationMs <= 0 || Math.abs(generatedDuration / targetDurationMs - 1) < 0.02) {
+  if (targetDurationMs <= 0) {
+    await execFFmpeg(['-i', rawFile, '-c', 'copy', '-y', adjustedFile]);
+    return { status: 'completed', generatedDuration, speedRatio: 1.0, error: null };
+  }
+
+  if (Math.abs(generatedDuration / targetDurationMs - 1) < 0.02) {
     await execFFmpeg(['-i', rawFile, '-c', 'copy', '-y', adjustedFile]);
     return { status: 'completed', generatedDuration, speedRatio: 1.0, error: null };
   }
@@ -225,7 +195,7 @@ export async function generateSegmentAudio(
     finalDuration = targetDurationMs;
   }
 
-  const DURATION_TOLERANCE_MS = 50;
+  // Always force exact match: trim or pad to exactly targetDurationMs
   if (Math.abs(finalDuration - targetDurationMs) > DURATION_TOLERANCE_MS && targetDurationMs > 0) {
     if (finalDuration > targetDurationMs) {
       const trimFile = adjustedFile + '.trim.mp3';
@@ -274,33 +244,61 @@ export async function generateSegmentAudio(
   return { status: 'completed', generatedDuration: finalDuration, speedRatio: ratio, error: null };
 }
 
-export async function exportFinalAudio(
-  jobDir: string,
+export async function buildTimelineAudio(
   segments: SubtitleSegmentData[],
   adjustedDir: string,
+  outputPath: string,
   options?: ExportOptions
-): Promise<string> {
+): Promise<{ durationMs: number; segmentCount: number; gapCount: number }> {
   const { gapMode = 'subtitle', smoothMerge = true, crossfadeMs = 20 } = options || {};
-  const finalFile = join(jobDir, 'final.mp3');
-  const allFiles: string[] = [];
-  const gapLog: string[] = [];
 
+  const completed = segments.filter(s => s.status === 'completed');
+  if (completed.length === 0) {
+    throw new Error('No completed segments to build timeline');
+  }
+
+  const firstStart = completed[0].startTime;
+  const lastEnd = completed[completed.length - 1].endTime;
+  const expectedDurationMs = lastEnd - firstStart;
+  const outputDir = dirname(outputPath);
+
+  interface SpeechGroup { files: string[] }
+  type TimelineItem = SpeechGroup | { silenceFile: string };
+  const items: TimelineItem[] = [];
+  let currentSpeech: string[] = [];
   let silenceIdx = 0;
+  let lastCompletedIdx = -1;
 
-  for (let i = 0; i < segments.length; i++) {
-    const seg = segments[i];
-    if (seg.status !== 'completed') continue;
+  if (firstStart > 0) {
+    const silenceFile = join(outputDir, `silence_${silenceIdx}.mp3`);
+    await execFFmpeg([
+      '-f', 'lavfi',
+      '-i', 'anullsrc=channel_layout=mono:sample_rate=24000',
+      '-t', (firstStart / 1000).toFixed(3),
+      '-c:a', 'libmp3lame',
+      '-b:a', '96k',
+      '-y',
+      silenceFile,
+    ]);
+    items.push({ silenceFile });
+    silenceIdx++;
+  }
 
+  for (let i = 0; i < completed.length; i++) {
+    const seg = completed[i];
     const adjustedPath = join(adjustedDir, `${String(seg.index).padStart(4, '0')}.mp3`);
-    allFiles.push(adjustedPath);
 
-    if (i < segments.length - 1) {
-      const nextSeg = segments[i + 1];
-      const gapMs = nextSeg.startTime - seg.endTime;
-      const gapEntry = `  Gap [seg${seg.index}→seg${nextSeg.index}]: ${gapMs}ms`;
+    if (lastCompletedIdx >= 0) {
+      const lastSeg = completed[lastCompletedIdx];
+      const gapMs = seg.startTime - lastSeg.endTime;
 
       if (gapMode === 'subtitle' && gapMs > 50) {
-        const silenceFile = join(jobDir, `silence_${silenceIdx}.mp3`);
+        if (currentSpeech.length > 0) {
+          items.push({ files: currentSpeech });
+          currentSpeech = [];
+        }
+
+        const silenceFile = join(outputDir, `silence_${silenceIdx}.mp3`);
         const durationSec = (gapMs / 1000).toFixed(3);
         await execFFmpeg([
           '-f', 'lavfi',
@@ -311,70 +309,152 @@ export async function exportFinalAudio(
           '-y',
           silenceFile,
         ]);
-        allFiles.push(silenceFile);
+        items.push({ silenceFile });
         silenceIdx++;
-        gapLog.push(gapEntry + ' (real gap, silence inserted)');
-      } else {
-        gapLog.push(gapEntry + ' (touching, no silence needed)');
       }
     }
+
+    currentSpeech.push(adjustedPath);
+    lastCompletedIdx = i;
   }
 
-  if (allFiles.length === 0) {
-    throw new Error('No completed segments to export');
+  if (currentSpeech.length > 0) {
+    items.push({ files: currentSpeech });
   }
 
-  const completedCount = segments.filter(s => s.status === 'completed').length;
-  console.log(`Export: gapMode=${gapMode}, smoothMerge=${smoothMerge}, crossfade=${crossfadeMs}ms, segments=${completedCount}, gaps=${silenceIdx}`);
-  for (const g of gapLog) console.log(g);
-
-  if (allFiles.length === 1) {
-    await execFFmpeg(['-i', allFiles[0], '-c', 'copy', '-y', finalFile]);
-    return finalFile;
+  if (items.length === 0) {
+    throw new Error('No items to build');
   }
 
-  if (smoothMerge) {
-    const inputs: string[] = [];
-    for (const f of allFiles) inputs.push('-i', f);
+  const speechGroupCount = items.filter(i => 'files' in i).length;
+  const totalCrossfadeLoss = (completed.length - speechGroupCount) * crossfadeMs;
 
-    const cfSec = (crossfadeMs / 1000).toFixed(3);
-    const filterParts: string[] = [];
-    for (let i = 1; i < allFiles.length; i++) {
-      const prevTag = i === 1 ? `0:a` : `f${i - 1}`;
-        const outTag = i === allFiles.length - 1 ? '' : `[f${i}]`;
-      filterParts.push(`[${prevTag}][${i}:a]acrossfade=d=${cfSec}${outTag}`);
+  const mergeTempFiles: string[] = [];
+  const finalInputs: string[] = [];
+
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    if ('silenceFile' in item) {
+      finalInputs.push(item.silenceFile);
+    } else if (item.files.length === 1) {
+      finalInputs.push(item.files[0]);
+    } else if (smoothMerge) {
+      const mergedFile = join(outputDir, `_merged_${idx}.mp3`);
+      await crossfadeMerge(item.files, crossfadeMs, mergedFile);
+      mergeTempFiles.push(mergedFile);
+      finalInputs.push(mergedFile);
+    } else {
+      const groupFile = join(outputDir, `_group_${idx}.mp3`);
+      const listFile = join(outputDir, `_group_${idx}.txt`);
+      const entries = item.files.map(f => `file '${f.replace(/\\/g, '/')}'`);
+      await writeFile(listFile, entries.join('\n'), 'utf-8');
+      await execFFmpeg(['-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-y', groupFile]);
+      await unlink(listFile).catch(() => {});
+      mergeTempFiles.push(groupFile);
+      finalInputs.push(groupFile);
     }
+  }
 
+  const fileList = join(outputDir, `_filelist.txt`);
+  const entries = finalInputs.map(f => `file '${f.replace(/\\/g, '/')}'`);
+  await writeFile(fileList, entries.join('\n'), 'utf-8');
+  await execFFmpeg(['-f', 'concat', '-safe', '0', '-i', fileList, '-c', 'copy', '-y', outputPath]);
+  await unlink(fileList).catch(() => {});
+
+  for (const f of mergeTempFiles) await unlink(f).catch(() => {});
+  for (let i = 0; i < silenceIdx; i++) {
+    await unlink(join(outputDir, `silence_${i}.mp3`)).catch(() => {});
+  }
+
+  let actualDuration: number;
+  try {
+    actualDuration = await getAudioDuration(outputPath);
+  } catch {
+    actualDuration = expectedDurationMs;
+  }
+
+  // Guarantee final duration matches the timeline
+  if (actualDuration < expectedDurationMs) {
+    const padMs = expectedDurationMs - actualDuration;
+    const silenceFile = join(outputDir, `_finalpad.mp3`);
     await execFFmpeg([
-      ...inputs,
-      '-filter_complex', filterParts.join(';'),
+      '-f', 'lavfi',
+      '-i', 'anullsrc=channel_layout=mono:sample_rate=24000',
+      '-t', (padMs / 1000).toFixed(3),
       '-c:a', 'libmp3lame',
       '-b:a', '96k',
       '-y',
-      finalFile,
+      silenceFile,
     ]);
-  } else {
-    const fileList = join(jobDir, 'export_files.txt');
-    const entries = allFiles.map(f => `file '${f.replace(/\\/g, '/')}'`);
-    await writeFile(fileList, entries.join('\n'), 'utf-8');
-
+    const listFile2 = join(outputDir, `_padlist.txt`);
+    await writeFile(listFile2,
+      `file '${outputPath.replace(/\\/g, '/')}'\nfile '${silenceFile.replace(/\\/g, '/')}'`, 'utf-8');
+    const paddedFile = join(outputDir, `_padded.mp3`);
+    await execFFmpeg(['-f', 'concat', '-safe', '0', '-i', listFile2, '-c', 'copy', '-y', paddedFile]);
+    await unlink(silenceFile).catch(() => {});
+    await unlink(listFile2).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+    await rename(paddedFile, outputPath);
+    actualDuration = expectedDurationMs;
+  } else if (actualDuration > expectedDurationMs) {
+    const trimmedFile = join(outputDir, `_trimmed.mp3`);
     await execFFmpeg([
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', fileList,
-      '-c', 'copy',
+      '-i', outputPath,
+      '-t', (expectedDurationMs / 1000).toFixed(3),
+      '-c:a', 'libmp3lame',
+      '-b:a', '96k',
       '-y',
-      finalFile,
+      trimmedFile,
     ]);
-
-    await unlink(fileList).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+    await rename(trimmedFile, outputPath);
+    actualDuration = expectedDurationMs;
   }
 
-  for (let i = 0; i < silenceIdx; i++) {
-    await unlink(join(jobDir, `silence_${i}.mp3`)).catch(() => {});
-  }
+  return {
+    durationMs: actualDuration,
+    segmentCount: completed.length,
+    gapCount: silenceIdx,
+  };
+}
+
+export async function exportFinalAudio(
+  jobDir: string,
+  segments: SubtitleSegmentData[],
+  adjustedDir: string,
+  options?: ExportOptions
+): Promise<string> {
+  const finalFile = join(jobDir, 'final.mp3');
+  const result = await buildTimelineAudio(segments, adjustedDir, finalFile, options);
+
+  const completedCount = segments.filter(s => s.status === 'completed').length;
+  console.log(`Export complete: ${completedCount} segments, ${result.gapCount} gaps, duration=${result.durationMs}ms`);
 
   return finalFile;
 }
 
-export { formatSRTTime, getAudioDuration, execFFmpeg };
+async function crossfadeMerge(files: string[], crossfadeMs: number, outputPath: string): Promise<void> {
+  if (files.length === 1) {
+    await execFFmpeg(['-i', files[0], '-c', 'copy', '-y', outputPath]);
+    return;
+  }
+  const inputs: string[] = [];
+  for (const f of files) inputs.push('-i', f);
+  const cfSec = (crossfadeMs / 1000).toFixed(3);
+  const filterParts: string[] = [];
+  for (let i = 1; i < files.length; i++) {
+    const prevTag = i === 1 ? '0:a' : `f${i - 1}`;
+    const outTag = i === files.length - 1 ? '' : `[f${i}]`;
+    filterParts.push(`[${prevTag}][${i}:a]acrossfade=d=${cfSec}${outTag}`);
+  }
+  await execFFmpeg([
+    ...inputs,
+    '-filter_complex', filterParts.join(';'),
+    '-c:a', 'libmp3lame',
+    '-b:a', '96k',
+    '-y',
+    outputPath,
+  ]);
+}
+
+export { formatSRTTime };

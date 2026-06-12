@@ -1,13 +1,31 @@
 {
-  "name": "text-to-speech",
-  "version": "1.0.0",
+  "name": "khmer-text-to-speech",
+  "version": "2.0.0",
+  "description": "Convert Khmer text to natural-sounding speech using Microsoft Edge TTS",
   "type": "module",
   "private": true,
+  "author": "Keosovanmakara",
+  "license": "MIT",
+  "keywords": [
+    "khmer",
+    "tts",
+    "text-to-speech",
+    "edge-tts",
+    "cambodia",
+    "speech-synthesis"
+  ],
   "scripts": {
     "voices": "tsx src/index.ts voices",
     "generate": "tsx src/index.ts generate",
     "serve": "tsx src/server.ts",
-    "typecheck": "tsc --noEmit"
+    "dev": "tsx watch src/server.ts",
+    "start": "npm run serve",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx tests/subtitle.test.ts",
+    "clean": "node -e \"require('fs').rmSync('output', {recursive:true,force:true})\" && node -e \"require('fs').rmSync('dist', {recursive:true,force:true})\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@andresaya/edge-tts": "^1.8.0",

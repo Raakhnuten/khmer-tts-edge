@@ -1,12 +1,34 @@
 # Khmer Text-to-Speech
 
-Converts Khmer text to natural-sounding speech using **Microsoft Edge TTS** (free, online).
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-blue.svg)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Khmer voices:**
-- `km-KH-PisethNeural` — Male (default)
-- `km-KH-SreymomNeural` — Female
+Convert Khmer text to natural-sounding speech using **Microsoft Edge TTS** (free, online). Features a web interface, CLI tools, and a subtitle audio editor.
 
-## Requirements
+**🎯 Key Features:**
+- 🗣️ Two Khmer voices (male & female)
+- 🌐 Web interface with real-time progress
+- 🎬 Subtitle audio editor with timing synchronization
+- 📝 Support for long text (up to 100,000 characters)
+- ⚡ Concurrent processing for speed
+- 🔄 Auto-resume for interrupted sessions
+- 🎵 High-quality MP3 output (24kHz, 96kbps)
+
+## 📋 Table of Contents
+
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Web Interface](#web-interface)
+- [CLI Usage](#cli-usage)
+- [Subtitle Editor](#subtitle-editor)
+- [API Documentation](#api-documentation)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+
+## 🔧 Requirements
 
 - **Node.js** 18+
 - **FFmpeg** (for merging audio chunks)
@@ -22,42 +44,133 @@ Converts Khmer text to natural-sounding speech using **Microsoft Edge TTS** (fre
    - Click OK, restart any open terminals
 4. Verify: open a new terminal and run `ffmpeg -version`
 
-## Setup
+## 📦 Installation
 
 ```bash
 npm install
 ```
 
-## Web Interface (recommended)
+## ⚙️ Configuration
+
+Create a `.env` file (optional):
 
 ```bash
-npm run serve
+cp .env.example .env
 ```
 
-Open http://localhost:3000 in your browser.
+Available environment variables:
 
-- Paste Khmer text, choose voice, click **Generate Audio**
-- Short text (≤5000 chars) generates directly
-- Long text creates a background job with progress tracking
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 3000 | Server port |
+| `TTS_CONCURRENCY` | 3 | Concurrent TTS requests (1-5) |
+| `OUTPUT_DIR` | output | Output directory path |
 
-## CLI Usage
+## 🚀 Quick Start
 
-### List voices
+### Web Interface (Recommended)
+
+1. Start the server:
+   ```bash
+   npm run serve
+   ```
+
+2. Open http://localhost:3000
+
+3. Paste Khmer text and generate audio!
+
+### CLI Quick Example
+
+1. Create your text file:
+   ```bash
+   echo "សួស្តី! នេះជាការសាកល្បង។" > input/text.txt
+   ```
+
+2. Generate audio:
+   ```bash
+   npm run generate
+   ```
+
+3. Find your audio: `output/output.mp3`
+
+## 🌐 Web Interface
+
+The web interface supports both short (≤5,000 characters) and long text generation.
+
+### Features:
+- **Direct generation** for short text (instant playback)
+- **Background jobs** for long text (with progress tracking)
+- **Voice selection**: Piseth (male) or Sreymom (female)
+- **Audio preview** and download
+- **Character counter** with mode indicator
+- **Sample text** for testing
+
+### Screenshots
+
+Main interface with voice selection and progress tracking:
+
+```
+┌─────────────────────────────────────┐
+│ Khmer TTS — បម្លែងអក្សរជាសំឡេង      │
+├─────────────────────────────────────┤
+│ [Khmer text input area]             │
+│                      5,234 characters│
+│ [Load sample] [Clear]               │
+├─────────────────────────────────────┤
+│ Voice:                              │
+│ [Piseth ✓] [Sreymom]                │
+├─────────────────────────────────────┤
+│ [Generate Audio]                    │
+│                                     │
+│ Processing chunk 45 of 100...       │
+│ ████████████░░░░░░░░░░░ 45%        │
+└─────────────────────────────────────┘
+```
+
+## 💻 CLI Usage
+
+### List Available Voices
 
 ```bash
 npm run voices
 ```
 
-### Generate audio from file
+Output:
+```
+Name                                          Locale       Gender     Local Name
+--------------------------------------------------------------------------------------
+km-KH-PisethNeural                            km-KH        Male       ពិសិដ្ឋ
+km-KH-SreymomNeural                           km-KH        Female     ស្រីមុំ
 
-Put text in `input/text.txt`, then:
+Total: 2 Khmer voice(s)
+```
+
+### Generate Audio from File
+
+1. Create or edit `input/text.txt` with your Khmer text
+2. Run generation:
 
 ```bash
-npm run generate                     # uses default voice (Piseth)
+# Use default voice (Piseth - male)
+npm run generate
+
+# Use specific voice (Sreymom - female)
 npm run generate -- --voice km-KH-SreymomNeural
 ```
 
-Output: `output/output.mp3`
+3. Output saved to: `output/output.mp3`
+
+### Resume Interrupted Sessions
+
+The CLI automatically resumes from the last successful chunk if interrupted:
+
+```bash
+# First run (interrupted at chunk 45/100)
+npm run generate
+
+# Re-run same command - skips chunks 1-45, continues from 46
+npm run generate
+```
 
 ## Long Audio (100,000 characters max)
 
@@ -151,7 +264,88 @@ Response:
 └── tsconfig.json
 ```
 
-## Subtitle Audio Editor
+## 📡 API Documentation
+
+### REST API Endpoints
+
+#### GET `/api/voices`
+List available Khmer voices.
+
+**Response:**
+```json
+[
+  {
+    "name": "km-KH-PisethNeural",
+    "locale": "km-KH",
+    "gender": "Male",
+    "localName": "ពិសិដ្ឋ"
+  }
+]
+```
+
+#### POST `/api/generate`
+Generate audio directly (for short text ≤5,000 characters).
+
+**Request:**
+```json
+{
+  "text": "សួស្តី!",
+  "voice": "km-KH-PisethNeural"
+}
+```
+
+**Response:** Binary MP3 audio stream
+
+**Errors:**
+- `400`: Invalid text or voice
+- `500`: Generation failed
+
+#### POST `/api/jobs`
+Create a background job for long text.
+
+**Request:**
+```json
+{
+  "text": "...long text...",
+  "voice": "km-KH-SreymomNeural"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid-job-id"
+}
+```
+
+#### GET `/api/jobs/:id`
+Poll job status and progress.
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "status": "processing",
+  "progress": 45,
+  "currentChunk": 45,
+  "totalChunks": 100,
+  "error": null,
+  "createdAt": "2026-06-07T15:10:00.000Z"
+}
+```
+
+Status values: `pending`, `processing`, `completed`, `failed`
+
+#### GET `/api/download/:id`
+Download completed job audio.
+
+**Response:** Binary MP3 file (attachment)
+
+### Subtitle API
+
+See [Subtitle Editor](#subtitle-editor) section for subtitle-specific endpoints.
+
+## 🎬 Subtitle Editor
 
 The subtitle editor lets you import SRT files, assign voices per subtitle segment, generate audio, adjust speed to fit timing, preview, and export a final merged MP3.
 
@@ -243,22 +437,133 @@ output/subtitle-jobs/<jobId>/
 | `POST` | `/api/subtitles/export` | Trigger final export |
 | `GET` | `/api/subtitles/export/:id/download` | Download exported MP3 |
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
-| Problem | Fix |
-|---|---|
-| `FFmpeg not found` | Install FFmpeg and add to PATH (see above) |
-| `Text does not contain any Khmer characters` | Make sure your text contains Khmer Unicode |
-| `Text too long` | Maximum 100,000 characters |
-| `ECONNREFUSED` / network error | Check internet connection; Edge TTS requires internet |
-| Process crashes mid-way | Re-run — sessions resume automatically |
-| `No completed segments` | Generate audio for at least one row before exporting |
-| `Segment audio not available` | Generate the segment first, then play |
-| SRT import fails | Check format: `HH:MM:SS,mmm --> HH:MM:SS,mmm` with Khmer text below |
+### Common Issues
 
-## Notes
+#### FFmpeg not found
 
-- Requires internet (calls Microsoft Edge TTS API)
-- ffmpeg must be installed for audio merging
-- 300ms silence inserted between chunks for natural pacing
-- Resumable — re-run the same CLI command to skip completed chunks
+**Error:** `FFmpeg not found. Install FFmpeg and add it to your PATH.`
+
+**Solution:**
+1. Download FFmpeg from https://ffmpeg.org/download.html
+2. Extract to `C:\ffmpeg` (Windows) or `/usr/local/bin` (Mac/Linux)
+3. Add to system PATH
+4. Restart terminal and verify: `ffmpeg -version`
+
+#### Text validation errors
+
+**Error:** `Text does not contain any Khmer characters`
+
+**Solution:** Ensure text contains Khmer Unicode (U+1780–U+17FF). Copy text from a reliable source or use the sample text button.
+
+#### Network errors
+
+**Error:** `ECONNREFUSED` or `network timeout`
+
+**Solution:**
+- Check internet connection (Edge TTS requires online access)
+- Disable VPN or proxy temporarily
+- Check firewall settings
+
+#### Port already in use
+
+**Error:** `EADDRINUSE: address already in use :::3000`
+
+**Solution:**
+```bash
+# Change port via environment variable
+PORT=3001 npm run serve
+
+# Or kill process using port 3000 (Windows)
+netstat -ano | findstr :3000
+taskkill /PID <PID> /F
+
+# Or (Linux/Mac)
+lsof -ti:3000 | xargs kill
+```
+
+#### Generation fails mid-way
+
+**Solution:** Re-run the same command. The session will resume from the last successful chunk automatically.
+
+#### Audio file is empty or corrupted
+
+**Possible causes:**
+- Interrupted generation
+- Disk space full
+- Invalid text characters
+
+**Solution:**
+1. Check available disk space
+2. Clear output directory: `npm run clean`
+3. Regenerate with smaller text chunk
+
+#### SRT import fails
+
+**Error:** `No valid subtitle blocks found`
+
+**Solution:** Ensure SRT format is correct:
+```srt
+1
+00:00:01,500 --> 00:00:04,000
+សួស្តី!
+
+2
+00:00:05,000 --> 00:00:08,500
+នេះជាឧទាហរណ៍
+```
+
+Time format must be: `HH:MM:SS,mmm` with `-->` separator.
+
+### Performance Tips
+
+1. **Adjust concurrency** for faster generation:
+   ```bash
+   TTS_CONCURRENCY=5 npm run serve
+   ```
+
+2. **Use direct generation** for text ≤5,000 chars (faster than jobs)
+
+3. **Process large files overnight** for texts over 50,000 characters
+
+### Getting Help
+
+- Check [existing issues](../../issues)
+- Create a [new issue](../../issues/new) with:
+  - OS and Node.js version
+  - Full error message
+  - Steps to reproduce
+  - Sample text (if applicable)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Quick contribution checklist:
+- [ ] Fork the repository
+- [ ] Create a feature branch
+- [ ] Make your changes
+- [ ] Run `npm run typecheck`
+- [ ] Test both web and CLI
+- [ ] Submit pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- Microsoft Edge TTS for providing free Khmer voices
+- [@andresaya/edge-tts](https://www.npmjs.com/package/@andresaya/edge-tts) npm package
+- Khmer language community
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](../../issues)
+- **Discussions**: [GitHub Discussions](../../discussions)
+- **Email**: [Your contact]
+
+---
+
+Made with ❤️ for the Khmer language community | ធ្វើឡើងដោយស្នេហា សម្រាប់សហគមន៍ភាសាខ្មែរ

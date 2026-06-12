@@ -1,12 +1,12 @@
 export const TTS_CONCURRENCY = Math.min(
   5,
-  Math.max(1, Number(process.env.TTS_CONCURRENCY || 3))
+  Math.max(1, Number(process.env.TTS_CONCURRENCY || 5)),
 );
 
 export async function asyncPool<T, R>(
   items: T[],
   limit: number,
-  worker: (item: T, index: number) => Promise<R>
+  worker: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   const errors: { index: number; error: any }[] = [];
@@ -33,10 +33,10 @@ export async function asyncPool<T, R>(
 
   if (errors.length > 0) {
     const messages = errors.map(
-      (e) => `[${e.index}] ${(e.error as Error)?.message || String(e.error)}`
+      (e) => `[${e.index}] ${(e.error as Error)?.message || String(e.error)}`,
     );
     throw new Error(
-      `asyncPool: ${errors.length} worker(s) failed:\n${messages.join('\n')}`
+      `asyncPool: ${errors.length} worker(s) failed:\n${messages.join("\n")}`,
     );
   }
 

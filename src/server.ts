@@ -6,10 +6,12 @@ import { randomUUID } from 'crypto';
 import { listAllVoices, isValidKhmerVoice, validateText, SHORT_TEXT_LIMIT } from './voices.js';
 import { generateAudio, ProgressInfo } from './generate.js';
 import {
-  parseSRT, generateSegmentAudio, exportFinalAudio, saveMetadata, formatTimeShort, getAudioDuration, execFFmpeg,
+  parseSRT, generateSegmentAudio, exportFinalAudio, saveMetadata, formatTimeShort,
+  buildTimelineAudio,
   SubtitleJobData, SubtitleSegmentData,
 } from './subtitle.js';
 import { asyncPool, TTS_CONCURRENCY } from './utils/asyncPool.js';
+import { execFFmpeg, getAudioDuration } from './utils/ffmpeg.js';
 
 const MAX_SRT_SIZE = 5 * 1024 * 1024; // 5MB max SRT upload
 
@@ -37,17 +39,24 @@ const subtitleJobs = new Map<string, SubtitleJobData>();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const OUTPUT_DIR = resolve('output');
-const TEMP_DIR = join(OUTPUT_DIR, 'tmp');
-const JOBS_DIR = join(OUTPUT_DIR, 'jobs');
-const SUBTITLE_JOBS_DIR = join(OUTPUT_DIR, 'subtitle-jobs');
+const OUTPUT_DIR = process.env.OUTPUT_DIR || resolve('output');
+const TEMP_DIR = process.env.TEMP_DIR || join(OUTPUT_DIR, 'tmp');
+const JOBS_DIR = process.env.JOBS_DIR || join(OUTPUT_DIR, 'jobs');
+const SUBTITLE_JOBS_DIR = process.env.SUBTITLE_JOBS_DIR || join(OUTPUT_DIR, 'subtitle-jobs');
 
 app.use(express.json({ limit: '5mb' }));
+app.use(express.static(resolve('public'), {
+  maxAge: '1h',
+  etag: true,
+  lastModified: true
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
-    console.log(`[API] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
+    const duration = Date.now() - start;
+    const logLevel = res.statusCode >= 400 ? 'ERROR' : 'INFO';
+    console.log(`[${logLevel}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
   });
   next();
 });
@@ -438,38 +447,21 @@ app.post('/api/subtitles/preview-completed', async (req, res) => {
     const jobDir = join(SUBTITLE_JOBS_DIR, jobId);
     const adjustedDir = join(jobDir, 'adjusted');
     const previewFile = join(jobDir, 'preview-completed.mp3');
-    const allFiles: string[] = [];
 
-    for (const seg of completed) {
-      const adjustedPath = join(adjustedDir, `${String(seg.index).padStart(4, '0')}.mp3`);
-      allFiles.push(adjustedPath);
-    }
+    const { gapMode = 'subtitle', smoothMerge = true, crossfadeMs = 20 } = req.body;
 
-    if (allFiles.length === 1) {
-      await execFFmpeg(['-i', allFiles[0], '-c', 'copy', '-y', previewFile]);
-    } else {
-      const fileList = join(jobDir, 'preview_files.txt');
-      const entries = allFiles.map(f => `file '${f.replace(/\\/g, '/')}'`);
-      await writeFile(fileList, entries.join('\n'), 'utf-8');
-      await execFFmpeg([
-        '-f', 'concat',
-        '-safe', '0',
-        '-i', fileList,
-        '-c', 'copy',
-        '-y',
-        previewFile,
-      ]);
-      await unlink(fileList).catch(() => {});
-    }
-
-    let duration = 0;
-    try { duration = await getAudioDuration(previewFile); } catch {}
+    const result = await buildTimelineAudio(
+      job.segments,
+      adjustedDir,
+      previewFile,
+      { gapMode, smoothMerge, crossfadeMs }
+    );
 
     res.json({
       success: true,
       url: `/api/subtitles/preview-completed/${jobId}`,
-      duration: Math.round(duration) / 1000,
-      segmentCount: completed.length,
+      duration: result.durationMs / 1000,
+      segmentCount: result.segmentCount,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -501,8 +493,6 @@ app.get('/', async (_req, res) => {
     res.status(500).send('index.html not found');
   }
 });
-
-app.use(express.static(resolve('public')));
 
 async function processSubtitleSegments(jobId: string, indices: number[], jobDir: string): Promise<void> {
   const job = subtitleJobs.get(jobId);
