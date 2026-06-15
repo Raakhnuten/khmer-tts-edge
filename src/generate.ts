@@ -3,12 +3,14 @@ import { mkdir, readdir, unlink, rmdir, writeFile, readFile } from 'fs/promises'
 import { join } from 'path';
 import { asyncPool, TTS_CONCURRENCY } from './utils/asyncPool.js';
 import { execFFmpeg } from './utils/ffmpeg.js';
-import { sleep } from './utils/helpers.js';
+import { sleep, computeTextHash } from './utils/helpers.js';
+import { config } from './config/index.js';
+import { logger } from './logger.js';
 
 const CHUNK_MAX_LENGTH = 1000;
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 2000;
-const CROSSFADE_MS = 20;
+const MAX_RETRIES = config.maxRetries;
+const RETRY_BASE_DELAY_MS = config.retryBaseDelayMs;
+const CROSSFADE_MS = config.crossfadeMs;
 
 export interface ProgressInfo {
   currentChunk: number;
@@ -18,14 +20,6 @@ export interface ProgressInfo {
 }
 
 export type ProgressCallback = (info: ProgressInfo) => void;
-
-function simpleHash(text: string): string {
-  let h = 0;
-  for (let i = 0; i < text.length; i++) {
-    h = ((h << 5) - h + text.charCodeAt(i)) | 0;
-  }
-  return (h >>> 0).toString(36);
-}
 
 const KHMER_SENTENCE_END = /(?:\n|[\u17D4\u17D5\u17D6])+/g;
 
@@ -126,7 +120,7 @@ async function trySynthesizeChunk(
   } catch {
     if (attempt < MAX_RETRIES) {
       const delay = RETRY_BASE_DELAY_MS * attempt;
-      console.log(`  Retry ${attempt}/${MAX_RETRIES} in ${delay}ms...`);
+      logger.warn({ chunkNum: chunkFile, attempt, delay }, `Retry ${attempt}/${MAX_RETRIES} in ${delay}ms...`);
       await sleep(delay);
     }
     return false;
@@ -147,7 +141,7 @@ export async function generateAudio(
 ): Promise<string> {
   await execFFmpeg(['-version']);
 
-  const textHash = simpleHash(text);
+  const textHash = computeTextHash(text);
   const sessionFile = join(outputDir, '.session');
   const chunksDir = join(outputDir, 'chunks');
 
@@ -216,8 +210,6 @@ export async function generateAudio(
       const chunkNum = chunkIndex + 1;
       const chunkFile = chunkFiles[chunkIndex];
 
-      process.stdout.write(`[${chunkNum}/${totalChunks}]... `);
-
       let ok = false;
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         ok = await trySynthesizeChunk(chunks[chunkIndex], voiceName, chunkFile, attempt);
@@ -225,11 +217,11 @@ export async function generateAudio(
       }
 
       if (!ok) {
-        console.error(`FAILED after ${MAX_RETRIES} attempts`);
+        logger.error({ chunkNum, totalChunks }, `Chunk ${chunkNum}/${totalChunks} FAILED after ${MAX_RETRIES} attempts`);
         return { ok: false, chunkNum };
       }
 
-      console.log(`OK`);
+      logger.info({ chunkNum, totalChunks }, `Chunk ${chunkNum}/${totalChunks} done`);
       progressCount++;
 
       onProgress?.({ currentChunk: progressCount, totalChunks, status: 'processing' });
@@ -254,13 +246,13 @@ export async function generateAudio(
   }
 
   if (skipped > 0) {
-    console.log(`Resumed: ${skipped} chunk(s) reused from previous run`);
+    logger.info({ skipped }, `Resumed: ${skipped} chunk(s) reused from previous run`);
   }
 
   const totalChunksForMerge = chunkFiles.length;
   const finalFile = join(outputDir, 'output.mp3');
 
-  console.log(`Merging chunks with crossfade (${CROSSFADE_MS}ms)...`);
+  logger.info({ crossfadeMs: CROSSFADE_MS, totalChunks: totalChunksForMerge }, `Merging ${totalChunksForMerge} chunks with crossfade (${CROSSFADE_MS}ms)...`);
 
   if (totalChunksForMerge === 1) {
     await execFFmpeg(['-i', chunkFiles[0], '-c', 'copy', '-y', finalFile]);
@@ -293,7 +285,7 @@ export async function generateAudio(
   await unlink(sessionFile).catch(() => {});
 
   const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`Done! Audio saved to: ${finalFile} (${totalTime}s)`);
+  logger.info({ finalFile, totalTimeSec: totalTime }, `Done! Audio saved to: ${finalFile} (${totalTime}s)`);
 
   onProgress?.({ currentChunk: totalChunks, totalChunks, status: 'completed' });
 

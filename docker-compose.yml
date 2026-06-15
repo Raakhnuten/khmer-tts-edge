@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/output/khmer-tts.db
+      - CACHE_DIR=/app/output/cache
+      - TTS_CONCURRENCY=5
+      - MAX_RETRIES=3
+      - RETRY_BASE_DELAY_MS=2000
+      - QUEUE_CONCURRENCY=3
+      - MAX_QUEUE_RETRIES=3
+      - QUEUE_RETRY_BASE_DELAY_MS=5000
+    volumes:
+      - tts_output:/app/output
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  tts_output:

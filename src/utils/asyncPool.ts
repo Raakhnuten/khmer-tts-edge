@@ -1,7 +1,6 @@
-export const TTS_CONCURRENCY = Math.min(
-  5,
-  Math.max(1, Number(process.env.TTS_CONCURRENCY || 5)),
-);
+import { config } from '../config/index.js';
+
+export const TTS_CONCURRENCY = config.ttsConcurrency;
 
 export async function asyncPool<T, R>(
   items: T[],

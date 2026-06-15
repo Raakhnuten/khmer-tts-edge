@@ -3,9 +3,11 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { execFFmpeg, getAudioDuration } from './utils/ffmpeg.js';
 import { sleep } from './utils/helpers.js';
+import { config } from './config/index.js';
+import { logger } from './logger.js';
 
-const MAX_RETRIES = 3;
-const RETRY_BASE_DELAY_MS = 2000;
+const MAX_RETRIES = config.maxRetries;
+const RETRY_BASE_DELAY_MS = config.retryBaseDelayMs;
 const DURATION_TOLERANCE_MS = 10;
 
 export interface SubtitleSegmentData {
@@ -25,6 +27,7 @@ export interface SubtitleJobData {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   segments: SubtitleSegmentData[];
   createdAt: string;
+  version?: number;
 }
 
 export interface ExportOptions {
@@ -52,7 +55,7 @@ export function parseSRT(srt: string): { startTime: number; endTime: number; tex
     const endTime = parseSRTTime(parts[1].trim());
 
     if (endTime <= startTime) {
-      console.warn(`Invalid subtitle timing: end ${endTime}ms <= start ${startTime}ms, skipping block`);
+      logger.warn({ startTime, endTime }, `Invalid subtitle timing: end ${endTime}ms <= start ${startTime}ms, skipping block`);
       continue;
     }
 
@@ -428,7 +431,7 @@ export async function exportFinalAudio(
   const result = await buildTimelineAudio(segments, adjustedDir, finalFile, options);
 
   const completedCount = segments.filter(s => s.status === 'completed').length;
-  console.log(`Export complete: ${completedCount} segments, ${result.gapCount} gaps, duration=${result.durationMs}ms`);
+  logger.info({ completedCount, gapCount: result.gapCount, durationMs: result.durationMs }, `Export complete: ${completedCount} segments, ${result.gapCount} gaps, duration=${result.durationMs}ms`);
 
   return finalFile;
 }
